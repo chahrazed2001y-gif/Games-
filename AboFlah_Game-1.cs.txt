@@ -1,0 +1,1084 @@
+// ============================================
+// 🎮 اللعبة: رحلة أبو فلة - أبو فلة Story Mode
+// 🎯 المحرك: Unity 3D (C#)
+// 📅 تاريخ البدء: 2016
+// 👤 الشخصية الرئيسية: أبو فلة (أبو فلة)
+// 📦 الحزمة الأساسية: ABOFLH_GAME
+// ============================================
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.Audio;
+using UnityEngine.Playables;
+using UnityEngine.Timeline;
+using Random = UnityEngine.Random;
+
+// ==================== المدراء الرئيسيون ====================
+
+/// <summary>
+/// مدير اللعبة الأساسي - يتحكم في الحالة العامة، الفصول، النهايات
+/// </summary>
+public class GameManager : MonoBehaviour
+{
+    public static GameManager Instance { get; private set; }
+
+    [Header("الحالة العامة")]
+    public GameState currentState = GameState.MainMenu;
+    public int currentChapter = 0;                     // 0 = البداية، 1 = النمو، 2 = الشهرة، 3 = التحديات، 4 = القمة
+    public int currentYear = 2016;
+    public int currentMonth = 1;
+    public int currentDay = 1;
+    public float gameTimeScale = 1f;
+
+    [Header("شخصية أبو فلة")]
+    public GameObject aboFlahCharacter;
+    public Transform aboFlahSpawnPoint;
+    public PlayerStats playerStats;
+
+    [Header("أنظمة اللعبة")]
+    public FollowersSystem followersSystem;
+    public VideoCreationSystem videoSystem;
+    public EquipmentSystem equipmentSystem;
+    public DialogueSystem dialogueSystem;
+    public CinematicSystem cinematicSystem;
+    public MissionSystem missionSystem;
+    public DecisionSystem decisionSystem;
+    public RevenueSystem revenueSystem;
+
+    [Header("نهايات اللعبة")]
+    public List<EndingDefinition> possibleEndings;
+    private EndingDefinition currentEnding;
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        InitializeSystems();
+    }
+
+    void InitializeSystems()
+    {
+        if (followersSystem == null) followersSystem = GetComponent<FollowersSystem>();
+        if (videoSystem == null) videoSystem = GetComponent<VideoCreationSystem>();
+        if (equipmentSystem == null) equipmentSystem = GetComponent<EquipmentSystem>();
+        if (dialogueSystem == null) dialogueSystem = GetComponent<DialogueSystem>();
+        if (cinematicSystem == null) cinematicSystem = GetComponent<CinematicSystem>();
+        if (missionSystem == null) missionSystem = GetComponent<MissionSystem>();
+        if (decisionSystem == null) decisionSystem = GetComponent<DecisionSystem>();
+        if (revenueSystem == null) revenueSystem = GetComponent<RevenueSystem>();
+
+        playerStats = new PlayerStats();
+        LoadGame();
+    }
+
+    void Start()
+    {
+        if (SceneManager.GetActiveScene().name == "MainMenu")
+        {
+            StartMainMenu();
+        }
+    }
+
+    void Update()
+    {
+        if (currentState == GameState.Playing)
+        {
+            UpdateGameTime();
+            CheckChapterProgression();
+            CheckEndingsConditions();
+        }
+    }
+
+    void UpdateGameTime()
+    {
+        Time.timeScale = gameTimeScale;
+    }
+
+    // ==================== الفصول ====================
+    void CheckChapterProgression()
+    {
+        switch (currentChapter)
+        {
+            case 0:
+                if (followersSystem.subscriberCount >= 1000 && videoSystem.totalViews >= 5000)
+                    AdvanceToChapter(1);
+                break;
+
+            case 1:
+                if (followersSystem.subscriberCount >= 100000)
+                    AdvanceToChapter(2);
+                break;
+
+            case 2:
+                if (followersSystem.subscriberCount >= 1000000)
+                    AdvanceToChapter(3);
+                break;
+
+            case 3:
+                if (followersSystem.subscriberCount >= 10000000 && missionSystem.IsChapterFourComplete())
+                    AdvanceToChapter(4);
+                break;
+
+            case 4:
+                if (followersSystem.subscriberCount >= 50000000 && missionSystem.IsFinalMissionComplete())
+                    TriggerEnding("EpicSuccess");
+                break;
+        }
+    }
+
+    public void AdvanceToChapter(int newChapter)
+    {
+        currentChapter = newChapter;
+        Debug.Log($"🎉 تقدم إلى الفصل {newChapter + 1}");
+
+        string cinematicName = GetChapterCinematicName(newChapter);
+        cinematicSystem.PlayCinematic(cinematicName);
+        missionSystem.UnlockChapterMissions(newChapter);
+        LoadChapterEnvironment(newChapter);
+    }
+
+    string GetChapterCinematicName(int chapter)
+    {
+        switch (chapter)
+        {
+            case 1: return "FirstMilestone_Cinematic";
+            case 2: return "FameArrives_Cinematic";
+            case 3: return "HeavyPressure_Cinematic";
+            case 4: return "TheSummit_Cinematic";
+            default: return "";
+        }
+    }
+
+    void LoadChapterEnvironment(int chapter)
+    {
+        SceneManager.LoadSceneAsync($"Chapter_{chapter}_Environment", LoadSceneMode.Additive);
+        if (chapter > 0)
+            SceneManager.UnloadSceneAsync($"Chapter_{chapter - 1}_Environment");
+    }
+
+    // ==================== النهايات ====================
+    void CheckEndingsConditions()
+    {
+        foreach (var ending in possibleEndings)
+        {
+            if (ending.IsConditionMet(this))
+            {
+                TriggerEnding(ending.endingName);
+                return;
+            }
+        }
+    }
+
+    void TriggerEnding(string endingName)
+    {
+        currentState = GameState.Ending;
+        var ending = possibleEndings.Find(e => e.endingName == endingName);
+        if (ending != null)
+        {
+            currentEnding = ending;
+            cinematicSystem.PlayEndingCinematic(ending.endingCinematic);
+            StartCoroutine(HandleEndingSequence(ending));
+        }
+    }
+
+    IEnumerator HandleEndingSequence(EndingDefinition ending)
+    {
+        yield return new WaitForSeconds(5f);
+        UIManager.Instance.ShowEndingScreen(ending);
+    }
+
+    // ==================== وظائف عامة ====================
+    public void StartMainMenu() { currentState = GameState.MainMenu; }
+
+    public void StartNewGame()
+    {
+        currentState = GameState.Playing;
+        currentChapter = 0;
+        currentYear = 2016;
+        currentMonth = 1;
+        currentDay = 1;
+        playerStats = new PlayerStats();
+        followersSystem.Reset();
+        videoSystem.Reset();
+        equipmentSystem.Reset();
+        missionSystem.ResetAll();
+        LoadChapterEnvironment(0);
+    }
+
+    public void SaveGame() { /* تسلسل البيانات وحفظها */ }
+    public void LoadGame() { /* تحميل البيانات المحفوظة */ }
+
+    public enum GameState
+    {
+        MainMenu,
+        Playing,
+        Paused,
+        Cinematic,
+        Dialogue,
+        Ending
+    }
+}
+
+// ==================== إحصائيات اللاعب ====================
+[System.Serializable]
+public class PlayerStats
+{
+    public string channelName = "أبو فلة";
+    public int energy = 100;
+    public int creativity = 50;
+    public int technicalSkill = 20;
+    public int charisma = 70;
+    public float money = 0f;
+    public int reputation = 0;
+    public int stress = 0;
+
+    public Dictionary<string, int> relationships = new Dictionary<string, int>();
+
+    public PlayerStats()
+    {
+        relationships.Add("Ahmed", 50);  // صديق المونتاج
+        relationships.Add("Fatima", 30); // متابعة وفيّة
+        relationships.Add("Omar", 10);   // منافس
+    }
+
+    public void ModifyEnergy(int amount)       { energy = Mathf.Clamp(energy + amount, 0, 100); }
+    public void ModifyCreativity(int amount)   { creativity = Mathf.Clamp(creativity + amount, 0, 100); }
+    public void ModifyMoney(float amount)      { money += amount; if (money < 0) money = 0; }
+    public void ModifyStress(int amount)       { stress = Mathf.Clamp(stress + amount, 0, 100); }
+}
+
+// ==================== نظام المتابعين والمشاهدات ====================
+public class FollowersSystem : MonoBehaviour
+{
+    [Header("إحصائيات القناة")]
+    public long subscriberCount = 0;
+    public long totalViews = 0;
+    public long monthlyViews = 0;
+    public float averageViewsPerVideo = 0f;
+    public int totalVideosUploaded = 0;
+    public float channelGrowthRate = 0.1f;
+
+    [Header("تحليلات")]
+    public List<string> audienceCountries;
+    public float engagementRate = 0f;
+    public int commentsCount = 0;
+    public int likesCount = 0;
+
+    public void Reset()
+    {
+        subscriberCount = 0;
+        totalViews = 0;
+        monthlyViews = 0;
+        averageViewsPerVideo = 0f;
+        totalVideosUploaded = 0;
+        channelGrowthRate = 0.1f;
+    }
+
+    public void AddVideoPerformance(VideoData video)
+    {
+        totalViews += video.views;
+        monthlyViews += video.views;
+        subscriberCount += video.newSubscribers;
+        totalVideosUploaded++;
+        averageViewsPerVideo = (float)totalViews / totalVideosUploaded;
+        UpdateEngagement(video);
+        UpdateGrowthRate();
+    }
+
+    void UpdateEngagement(VideoData video)
+    {
+        likesCount += video.likes;
+        commentsCount += video.comments;
+        engagementRate = (float)(likesCount + commentsCount) / Mathf.Max(totalViews, 1) * 100f;
+    }
+
+    void UpdateGrowthRate()
+    {
+        float qualityFactor = GameManager.Instance.equipmentSystem.GetQualityFactor();
+        float trendBonus = GameManager.Instance.videoSystem.GetTrendAlignmentBonus();
+        float consistencyBonus = GameManager.Instance.videoSystem.uploadStreak > 7 ? 1.5f : 1f;
+        channelGrowthRate = 0.1f * qualityFactor * trendBonus * consistencyBonus;
+    }
+
+    public int GetDailyNewSubscribers()
+    {
+        return Mathf.RoundToInt(subscriberCount * channelGrowthRate * 0.01f);
+    }
+
+    public void SimulateDayPass()
+    {
+        int newSubs = GetDailyNewSubscribers();
+        subscriberCount += newSubs;
+        long dailyViews = (long)(totalViews * channelGrowthRate * 0.005f);
+        totalViews += dailyViews;
+        monthlyViews += dailyViews;
+    }
+}
+
+// ==================== نظام صناعة الفيديو ====================
+[System.Serializable]
+public class VideoData
+{
+    public string title;
+    public string description;
+    public string tags;
+    public VideoCategory category;
+    public float duration;
+    public DateTime uploadDate;
+    public long views;
+    public int likes;
+    public int comments;
+    public int newSubscribers;
+    public float qualityScore;
+    public bool isTrending;
+    public string thumbnailPath;
+
+    public enum VideoCategory { Vlog, Gaming, Comedy, Challenge, Charity, Reaction, Educational, Other }
+}
+
+public class VideoCreationSystem : MonoBehaviour
+{
+    [Header("حالة التسجيل")]
+    public bool isRecording = false;
+    public float recordingProgress = 0f;
+    public float requiredRecordingTime = 600f;
+    public VideoData currentVideoDraft;
+
+    [Header("جودة الفيديو")]
+    public float scriptQuality = 0f;
+    public float audioQuality = 0f;
+    public float editingQuality = 0f;
+    public float thumbnailAttractiveness = 0f;
+
+    [Header("سجل الرفع")]
+    public List<VideoData> uploadedVideos = new List<VideoData>();
+    public int uploadStreak = 0;
+    public long totalViews = 0;
+
+    [Header("ترندات")]
+    public List<string> currentTrends;
+
+    private FollowersSystem followers;
+
+    void Start()
+    {
+        followers = GameManager.Instance.followersSystem;
+        currentTrends = new List<string> { "تحديات 2016", "ألعاب الفيديو", "مقاطع مضحكة" };
+    }
+
+    public void StartRecording()
+    {
+        if (GameManager.Instance.playerStats.energy < 10)
+        {
+            Debug.Log("الطاقة منخفضة جداً! احصل على قسط من الراحة.");
+            return;
+        }
+        isRecording = true;
+        recordingProgress = 0f;
+        currentVideoDraft = new VideoData();
+        currentVideoDraft.category = ChooseCategory();
+        Debug.Log("بدأ التسجيل...");
+    }
+
+    public void UpdateRecording(float deltaTime)
+    {
+        if (!isRecording) return;
+        recordingProgress += deltaTime * GameManager.Instance.playerStats.creativity / 50f;
+        if (recordingProgress >= requiredRecordingTime)
+            FinishRecording();
+    }
+
+    void FinishRecording()
+    {
+        isRecording = false;
+        Debug.Log("انتهى التسجيل! حان وقت المونتاج.");
+        currentVideoDraft.qualityScore = CalculateBaseQuality();
+        UIManager.Instance.ShowEditingInterface(currentVideoDraft);
+    }
+
+    float CalculateBaseQuality()
+    {
+        EquipmentSystem equip = GameManager.Instance.equipmentSystem;
+        PlayerStats stats = GameManager.Instance.playerStats;
+        float baseQuality = 30f;
+        baseQuality += equip.cameraQuality * 0.3f;
+        baseQuality += equip.microphoneQuality * 0.2f;
+        baseQuality += stats.creativity * 0.3f;
+        baseQuality += stats.technicalSkill * 0.2f;
+        return Mathf.Clamp(baseQuality, 0f, 100f);
+    }
+
+    public void ApplyEditing(float editingSkill, float timeSpent)
+    {
+        editingQuality = Mathf.Clamp(editingSkill * timeSpent / 100f, 0f, 100f);
+        currentVideoDraft.qualityScore = (currentVideoDraft.qualityScore + editingQuality) / 2f;
+    }
+
+    public void UploadVideo(string title, string description, string tags)
+    {
+        currentVideoDraft.title = title;
+        currentVideoDraft.description = description;
+        currentVideoDraft.tags = tags;
+        currentVideoDraft.uploadDate = DateTime.Now;
+        currentVideoDraft.duration = requiredRecordingTime;
+
+        SimulateVideoPerformance(currentVideoDraft);
+
+        uploadedVideos.Add(currentVideoDraft);
+        totalViews += currentVideoDraft.views;
+        followers.AddVideoPerformance(currentVideoDraft);
+        GameManager.Instance.playerStats.ModifyEnergy(-30);
+        uploadStreak++;
+        currentVideoDraft = null;
+
+        Debug.Log($"تم رفع الفيديو: {title}");
+    }
+
+    void SimulateVideoPerformance(VideoData video)
+    {
+        float qualityFactor = video.qualityScore / 100f;
+        long basePotential = followers.subscriberCount > 0 ? followers.subscriberCount * 2 : 100;
+        float trendFactor = currentTrends.Contains(video.tags) ? 2f : 1f;
+        float luckFactor = Random.Range(0.5f, 2f);
+
+        video.views = (long)(basePotential * qualityFactor * trendFactor * luckFactor);
+        video.likes = (int)(video.views * 0.05f);
+        video.comments = (int)(video.views * 0.01f);
+        video.newSubscribers = (int)(video.views * ChannelConversionRate());
+    }
+
+    float ChannelConversionRate()
+    {
+        return 0.01f * GameManager.Instance.equipmentSystem.GetOverallQuality() * 0.5f;
+    }
+
+    VideoData.VideoCategory ChooseCategory()
+    {
+        int chapter = GameManager.Instance.currentChapter;
+        if (chapter >= 3) return VideoData.VideoCategory.Charity;
+        if (chapter == 2) return VideoData.VideoCategory.Challenge;
+        return VideoData.VideoCategory.Vlog;
+    }
+
+    public float GetTrendAlignmentBonus()
+    {
+        return 1.0f;
+    }
+
+    public void Reset()
+    {
+        uploadedVideos.Clear();
+        uploadStreak = 0;
+        totalViews = 0;
+    }
+}
+
+// ==================== نظام المعدات ====================
+[System.Serializable]
+public class Equipment
+{
+    public string name;
+    public EquipmentType type;
+    public int level;
+    public float quality;
+    public float price;
+    public Sprite icon;
+    public string description;
+
+    public enum EquipmentType { Camera, Microphone, Lighting, Computer, EditingSoftware, StudioSetup }
+}
+
+public class EquipmentSystem : MonoBehaviour
+{
+    public List<Equipment> ownedEquipment = new List<Equipment>();
+    public Equipment currentCamera;
+    public Equipment currentMicrophone;
+    public Equipment currentComputer;
+    public Equipment currentEditingSoftware;
+    public Equipment currentLighting;
+
+    [Header("قيم الجودة الحالية")]
+    public float cameraQuality = 0.2f;
+    public float microphoneQuality = 0.2f;
+    public float computerQuality = 0.3f;
+    public float lightingQuality = 0.1f;
+    public float softwareQuality = 0.1f;
+
+    void Start()
+    {
+        currentCamera          = new Equipment { name = "كاميرا لابتوب مدمجة",    type = Equipment.EquipmentType.Camera,          level = 1, quality = 0.2f, price = 0 };
+        currentMicrophone      = new Equipment { name = "ميكروفون اللابتوب",       type = Equipment.EquipmentType.Microphone,      level = 1, quality = 0.2f, price = 0 };
+        currentComputer        = new Equipment { name = "حاسوب محمول قديم",        type = Equipment.EquipmentType.Computer,        level = 1, quality = 0.3f, price = 0 };
+        currentEditingSoftware = new Equipment { name = "Windows Movie Maker",     type = Equipment.EquipmentType.EditingSoftware, level = 1, quality = 0.1f, price = 0 };
+        currentLighting        = new Equipment { name = "إضاءة الغرفة",           type = Equipment.EquipmentType.Lighting,        level = 1, quality = 0.1f, price = 0 };
+
+        ownedEquipment.AddRange(new[] { currentCamera, currentMicrophone, currentComputer, currentEditingSoftware, currentLighting });
+    }
+
+    public void PurchaseEquipment(Equipment newEquip)
+    {
+        if (GameManager.Instance.playerStats.money >= newEquip.price)
+        {
+            GameManager.Instance.playerStats.ModifyMoney(-newEquip.price);
+            ownedEquipment.Add(newEquip);
+            ApplyEquipment(newEquip);
+            Debug.Log($"تم شراء {newEquip.name}");
+        }
+    }
+
+    void ApplyEquipment(Equipment equip)
+    {
+        switch (equip.type)
+        {
+            case Equipment.EquipmentType.Camera:
+                currentCamera = equip;
+                cameraQuality = equip.quality;
+                break;
+            case Equipment.EquipmentType.Microphone:
+                currentMicrophone = equip;
+                microphoneQuality = equip.quality;
+                break;
+            case Equipment.EquipmentType.Computer:
+                currentComputer = equip;
+                computerQuality = equip.quality;
+                break;
+            case Equipment.EquipmentType.EditingSoftware:
+                currentEditingSoftware = equip;
+                softwareQuality = equip.quality;
+                break;
+            case Equipment.EquipmentType.Lighting:
+                currentLighting = equip;
+                lightingQuality = equip.quality;
+                break;
+        }
+    }
+
+    public float GetOverallQuality()
+    {
+        return (cameraQuality + microphoneQuality + computerQuality + lightingQuality + softwareQuality) / 5f;
+    }
+
+    public float GetQualityFactor()
+    {
+        return 1f + GetOverallQuality();
+    }
+
+    public void Reset()
+    {
+        ownedEquipment.Clear();
+        Start();
+    }
+}
+
+// ==================== نظام الحوارات ====================
+[System.Serializable]
+public class DialogueLine
+{
+    public string speakerName;
+    public string text;
+    public AudioClip voiceClip;
+    public Sprite speakerPortrait;
+    public float duration;
+    public List<DialogueChoice> choices;
+
+    public DialogueLine(string speaker, string txt)
+    {
+        speakerName = speaker;
+        text = txt;
+        choices = new List<DialogueChoice>();
+    }
+}
+
+[System.Serializable]
+public class DialogueChoice
+{
+    public string choiceText;
+    public int nextLineIndex;
+    public System.Action onChosen;
+    public int reputationEffect;
+    public int stressEffect;
+}
+
+public class DialogueSystem : MonoBehaviour
+{
+    private Queue<DialogueLine> currentDialogueQueue;
+    private bool isDialogueActive;
+    public event System.Action OnDialogueEnd;
+
+    public void StartDialogue(List<DialogueLine> lines)
+    {
+        currentDialogueQueue = new Queue<DialogueLine>(lines);
+        isDialogueActive = true;
+        GameManager.Instance.currentState = GameManager.GameState.Dialogue;
+        DisplayNextLine();
+    }
+
+    public void DisplayNextLine()
+    {
+        if (currentDialogueQueue.Count == 0)
+        {
+            EndDialogue();
+            return;
+        }
+        DialogueLine line = currentDialogueQueue.Dequeue();
+        UIManager.Instance.ShowDialogueLine(line);
+    }
+
+    public void MakeChoice(DialogueChoice choice)
+    {
+        GameManager.Instance.playerStats.reputation += choice.reputationEffect;
+        GameManager.Instance.playerStats.ModifyStress(choice.stressEffect);
+        choice.onChosen?.Invoke();
+        DisplayNextLine();
+    }
+
+    void EndDialogue()
+    {
+        isDialogueActive = false;
+        GameManager.Instance.currentState = GameManager.GameState.Playing;
+        OnDialogueEnd?.Invoke();
+        UIManager.Instance.HideDialogue();
+    }
+}
+
+// ==================== نظام المشاهد السينمائية ====================
+[System.Serializable]
+public class CinematicDefinition
+{
+    public string cinematicName;
+    public PlayableDirector director;
+    public bool isEnding;
+    public float duration;
+}
+
+public class CinematicSystem : MonoBehaviour
+{
+    public List<CinematicDefinition> cinematicLibrary;
+
+    public void PlayCinematic(string name)
+    {
+        CinematicDefinition def = cinematicLibrary.Find(c => c.cinematicName == name);
+        if (def != null && def.director != null)
+        {
+            GameManager.Instance.currentState = GameManager.GameState.Cinematic;
+            def.director.stopped += OnCinematicFinished;
+            def.director.Play();
+        }
+    }
+
+    void OnCinematicFinished(PlayableDirector director)
+    {
+        director.stopped -= OnCinematicFinished;
+        GameManager.Instance.currentState = GameManager.GameState.Playing;
+    }
+
+    public void PlayEndingCinematic(string name)
+    {
+        PlayCinematic(name);
+    }
+}
+
+// ==================== نظام المهام ====================
+[System.Serializable]
+public class Mission
+{
+    public string missionID;
+    public string title;
+    public string description;
+    public int chapter;
+    public bool isCompleted;
+    public bool isActive;
+    public MissionObjective[] objectives;
+    public int rewardMoney;
+    public int rewardReputation;
+    public Equipment rewardEquipment;
+}
+
+[System.Serializable]
+public class MissionObjective
+{
+    public string description;
+    public ObjectiveType type;
+    public int requiredAmount;
+    public int currentAmount;
+    public bool IsComplete => currentAmount >= requiredAmount;
+
+    public enum ObjectiveType
+    {
+        RecordVideo,
+        GetSubscribers,
+        GetViews,
+        BuyEquipment,
+        CompleteDialogue,
+        ReachChapter,
+        MakeDecision,
+        DoCharityEvent
+    }
+}
+
+public class MissionSystem : MonoBehaviour
+{
+    public List<Mission> allMissions;
+    public List<Mission> activeMissions;
+    public List<Mission> completedMissions;
+
+    public void UnlockChapterMissions(int chapter)
+    {
+        var chapterMissions = allMissions.FindAll(m => m.chapter == chapter && !m.isCompleted);
+        foreach (var mission in chapterMissions)
+        {
+            mission.isActive = true;
+            activeMissions.Add(mission);
+            UIManager.Instance.ShowMissionNotification(mission);
+        }
+    }
+
+    public void UpdateMissionProgress(MissionObjective.ObjectiveType type, int amount)
+    {
+        foreach (var mission in activeMissions)
+        {
+            foreach (var obj in mission.objectives)
+            {
+                if (obj.type == type && !obj.IsComplete)
+                {
+                    obj.currentAmount += amount;
+                    if (obj.IsComplete)
+                        CheckMissionCompletion(mission);
+                }
+            }
+        }
+    }
+
+    void CheckMissionCompletion(Mission mission)
+    {
+        if (System.Array.TrueForAll(mission.objectives, o => o.IsComplete))
+            CompleteMission(mission);
+    }
+
+    void CompleteMission(Mission mission)
+    {
+        mission.isCompleted = true;
+        activeMissions.Remove(mission);
+        completedMissions.Add(mission);
+        GameManager.Instance.playerStats.ModifyMoney(mission.rewardMoney);
+        GameManager.Instance.playerStats.reputation += mission.rewardReputation;
+        if (mission.rewardEquipment != null)
+            GameManager.Instance.equipmentSystem.PurchaseEquipment(mission.rewardEquipment);
+        UIManager.Instance.ShowMissionComplete(mission);
+    }
+
+    public bool IsChapterFourComplete()
+    {
+        return completedMissions.Exists(m => m.missionID == "Charity_Mega_Event");
+    }
+
+    public bool IsFinalMissionComplete()
+    {
+        return completedMissions.Exists(m => m.missionID == "Studio_Building");
+    }
+
+    public void ResetAll()
+    {
+        activeMissions.Clear();
+        completedMissions.Clear();
+    }
+}
+
+// ==================== نظام القرارات ====================
+[System.Serializable]
+public class Decision
+{
+    public string decisionID;
+    public string prompt;
+    public List<DecisionOption> options;
+}
+
+[System.Serializable]
+public class DecisionOption
+{
+    public string text;
+    public int followersEffect;
+    public int moneyEffect;
+    public int reputationEffect;
+    public int stressEffect;
+    public string resultDialogueID;
+}
+
+public class DecisionSystem : MonoBehaviour
+{
+    public void PresentDecision(Decision decision)
+    {
+        GameManager.Instance.currentState = GameManager.GameState.Dialogue;
+        UIManager.Instance.ShowDecisionPanel(decision, OnDecisionMade);
+    }
+
+    void OnDecisionMade(DecisionOption chosen)
+    {
+        FollowersSystem f = GameManager.Instance.followersSystem;
+        PlayerStats s = GameManager.Instance.playerStats;
+
+        f.subscriberCount = Math.Max(0, f.subscriberCount + chosen.followersEffect);
+        s.ModifyMoney(chosen.moneyEffect);
+        s.reputation += chosen.reputationEffect;
+        s.ModifyStress(chosen.stressEffect);
+
+        GameManager.Instance.currentState = GameManager.GameState.Playing;
+        UIManager.Instance.HideDecisionPanel();
+    }
+}
+
+// ==================== نظام الأرباح ====================
+public class RevenueSystem : MonoBehaviour
+{
+    public float cpmRate = 1.5f;
+    public float sponsorshipIncome = 0f;
+    public float merchandiseIncome = 0f;
+    public float totalEarnings = 0f;
+
+    void Update()
+    {
+        if (GameManager.Instance.currentState == GameManager.GameState.Playing)
+        {
+            float adRevenue = (GameManager.Instance.followersSystem.monthlyViews / 1000f) * cpmRate;
+            totalEarnings += adRevenue * Time.deltaTime;
+            GameManager.Instance.playerStats.ModifyMoney(adRevenue * Time.deltaTime);
+        }
+    }
+
+    public void UpdateCPMRate()
+    {
+        cpmRate = 1.5f + (GameManager.Instance.followersSystem.subscriberCount / 1000000f) * 2f;
+    }
+}
+
+// ==================== الشخصيات الأخرى ====================
+[System.Serializable]
+public class Character
+{
+    public string name;
+    public string role;
+    public int relationshipLevel;
+    public GameObject characterModel;
+    public List<DialogueLine> interactionDialogues;
+}
+
+// ==================== تعريف النهاية ====================
+[System.Serializable]
+public class EndingDefinition
+{
+    public string endingName;
+    public string endingCinematic;
+    public string description;
+    public System.Func<GameManager, bool> IsConditionMet;
+}
+
+// ==================== تحكم اللاعب (أبو فلة) ====================
+public class AboFlahController : MonoBehaviour
+{
+    public float moveSpeed = 5f;
+    public float rotationSpeed = 10f;
+    private CharacterController controller;
+    private Animator animator;
+    private Vector3 moveDirection;
+    public bool isInteracting = false;
+    public Interactable currentInteractable;
+
+    void Start()
+    {
+        controller = GetComponent<CharacterController>();
+        animator = GetComponent<Animator>();
+    }
+
+    void Update()
+    {
+        if (GameManager.Instance.currentState != GameManager.GameState.Playing)
+            return;
+
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
+
+        Vector3 forward = Camera.main.transform.forward;
+        Vector3 right = Camera.main.transform.right;
+        forward.y = 0; right.y = 0;
+
+        moveDirection = (forward * vertical + right * horizontal).normalized * moveSpeed;
+        controller.Move(moveDirection * Time.deltaTime);
+
+        if (moveDirection.magnitude > 0.1f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            animator.SetBool("isWalking", true);
+        }
+        else
+        {
+            animator.SetBool("isWalking", false);
+        }
+
+        if (Input.GetKeyDown(KeyCode.E) && currentInteractable != null)
+            currentInteractable.Interact();
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        Interactable interactable = other.GetComponent<Interactable>();
+        if (interactable != null)
+        {
+            currentInteractable = interactable;
+            UIManager.Instance.ShowInteractPrompt(interactable.promptText);
+        }
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.GetComponent<Interactable>() == currentInteractable)
+        {
+            currentInteractable = null;
+            UIManager.Instance.HideInteractPrompt();
+        }
+    }
+}
+
+// ==================== الأشياء التفاعلية ====================
+public abstract class Interactable : MonoBehaviour
+{
+    public string promptText = "اضغط E للتفاعل";
+    public abstract void Interact();
+}
+
+public class ComputerInteractable : Interactable
+{
+    public override void Interact()
+    {
+        UIManager.Instance.ShowVideoCreationMenu();
+    }
+}
+
+public class BedInteractable : Interactable
+{
+    public override void Interact()
+    {
+        GameManager.Instance.playerStats.ModifyEnergy(80);
+        GameManager.Instance.playerStats.ModifyStress(-20);
+        GameManager.Instance.followersSystem.SimulateDayPass();
+        GameManager.Instance.missionSystem.UpdateMissionProgress(MissionObjective.ObjectiveType.RecordVideo, 0);
+    }
+}
+
+public class CameraEquipmentInteractable : Interactable
+{
+    public override void Interact()
+    {
+        UIManager.Instance.ShowEquipmentShop();
+    }
+}
+
+// ==================== واجهة المستخدم ====================
+public class UIManager : MonoBehaviour
+{
+    public static UIManager Instance { get; private set; }
+
+    [Header("شاشات")]
+    public GameObject mainMenuScreen;
+    public GameObject HUD;
+    public GameObject videoCreationPanel;
+    public GameObject editingPanel;
+    public GameObject dialoguePanel;
+    public GameObject decisionPanel;
+    public GameObject endingScreen;
+    public GameObject interactPromptText;
+
+    void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+    }
+
+    public void ShowDialogueLine(DialogueLine line)
+    {
+        dialoguePanel.SetActive(true);
+        dialoguePanel.GetComponentInChildren<Text>().text = $"{line.speakerName}: {line.text}";
+    }
+
+    public void HideDialogue()                                              { dialoguePanel.SetActive(false); }
+    public void ShowDecisionPanel(Decision decision, System.Action<DecisionOption> callback) { decisionPanel.SetActive(true); }
+    public void HideDecisionPanel()                                         { decisionPanel.SetActive(false); }
+
+    public void ShowEndingScreen(EndingDefinition ending)
+    {
+        endingScreen.SetActive(true);
+        endingScreen.GetComponentInChildren<Text>().text = ending.description;
+    }
+
+    public void ShowInteractPrompt(string text)
+    {
+        interactPromptText.SetActive(true);
+        interactPromptText.GetComponent<Text>().text = text;
+    }
+
+    public void HideInteractPrompt()                                        { interactPromptText.SetActive(false); }
+    public void ShowVideoCreationMenu()                                     { videoCreationPanel.SetActive(true); }
+    public void ShowEditingInterface(VideoData draft)                       { editingPanel.SetActive(true); }
+    public void ShowEquipmentShop()                                         { /* عرض متجر المعدات */ }
+    public void ShowMissionNotification(Mission m)                          { /* إشعار */ }
+    public void ShowMissionComplete(Mission m)                              { /* شاشة إنجاز */ }
+}
+
+// ==================== مُشغّل اللعبة ====================
+public class GameBootstrapper : MonoBehaviour
+{
+    public GameManager gameManagerPrefab;
+
+    void Awake()
+    {
+        if (GameManager.Instance == null)
+            Instantiate(gameManagerPrefab);
+    }
+}
+
+// ==================== تطور القصة ====================
+public class StoryProgression : MonoBehaviour
+{
+    public void Trigger2016StartEvent()
+    {
+        DialogueSystem ds = GameManager.Instance.dialogueSystem;
+        List<DialogueLine> introDialogue = new List<DialogueLine>
+        {
+            new DialogueLine("أبو فلة", "أنا عندي حلم... أريد أن أصبح أكبر يوتيوبر عربي."),
+            new DialogueLine("أبو فلة", "راح أبدأ بقناتي اليوم. لديّ حاسوب قديم وإنترنت ضعيف."),
+            new DialogueLine("أبو فلة", "لكن العزيمة والإصرار راح يخلوني أوصل.")
+        };
+        ds.StartDialogue(introDialogue);
+    }
+
+    public void TriggerMillionSubscribersCelebration()
+    {
+        GameManager.Instance.cinematicSystem.PlayCinematic("MillionSubs_Celebration");
+        GameManager.Instance.followersSystem.subscriberCount = 1000000;
+    }
+
+    public void TriggerCharityEventDecision()
+    {
+        Decision charityDecision = new Decision
+        {
+            decisionID = "charity_1",
+            prompt = "هل تشارك في حملة التبرعات الكبرى للأطفال؟",
+            options = new List<DecisionOption>
+            {
+                new DecisionOption { text = "نعم، بكل تأكيد!", followersEffect = 50000,  moneyEffect = -10000, reputationEffect =  100, stressEffect = -10 },
+                new DecisionOption { text = "لست مستعداً الآن",  followersEffect = -5000, moneyEffect = 0,      reputationEffect = -20,  stressEffect =   5 }
+            }
+        };
+        GameManager.Instance.decisionSystem.PresentDecision(charityDecision);
+    }
+}
