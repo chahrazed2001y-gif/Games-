@@ -1,0 +1,1458 @@
+# =============================================================
+#  🎮 رحلة أبو فلة - النسخة الكاملة v2.0
+#  يعمل على Godot 4.2+ للهاتف - ملف واحد فقط
+#  كيف تستخدمه:
+#    1. افتح Godot 4.2+
+#    2. أنشئ مشروع جديد (2D)
+#    3. أضف Node2D كـ root scene
+#    4. ألصق هذا الكود في script للـ Node2D
+#    5. شغّل المشروع مباشرةً
+# =============================================================
+extends Node2D
+
+# ===================== ألوان اللعبة =====================
+const C_BG     = Color(0.07, 0.07, 0.18)
+const C_PANEL  = Color(0.12, 0.12, 0.25, 0.97)
+const C_ACCENT = Color(0.98, 0.72, 0.07)
+const C_RED    = Color(0.9,  0.2,  0.2)
+const C_GREEN  = Color(0.2,  0.85, 0.4)
+const C_BLUE   = Color(0.2,  0.55, 1.0)
+const C_WHITE  = Color(1.0,  1.0,  1.0)
+const C_GREY   = Color(0.5,  0.5,  0.5)
+const C_DARK   = Color(0.04, 0.04, 0.10)
+const C_GOLD   = Color(1.0,  0.84, 0.0)
+const C_PURPLE = Color(0.6,  0.2,  0.9)
+
+# ===================== إحصائيات اللاعب =====================
+var stats = {
+	"energy":        100.0,
+	"creativity":     50.0,
+	"tech_skill":     20.0,
+	"charisma":       70.0,
+	"money":           0.0,
+	"reputation":      0,
+	"stress":          0.0,
+	"happiness":      80.0,
+	"motivation":     90.0,
+	"editing_skill":  10.0
+}
+
+# ===================== نظام القناة =====================
+var channel = {
+	"name":           "أبو فلة",
+	"subs":           0,
+	"total_views":    0,
+	"videos":         0,
+	"growth":         0.1,
+	"likes":          0,
+	"comments":       0,
+	"income_per_1k":  0.5,
+	"monthly_income": 0.0,
+	"trending":       false
+}
+
+# ===================== المعدات =====================
+var gear = {
+	"cam":   {"level": 1, "quality": 0.2, "name": "موبايل قديم"},
+	"mic":   {"level": 1, "quality": 0.2, "name": "ميكروفون رخيص"},
+	"pc":    {"level": 1, "quality": 0.3, "name": "حاسوب قديم"},
+	"soft":  {"level": 1, "quality": 0.1, "name": "مونتاج مجاني"},
+	"light": {"level": 1, "quality": 0.1, "name": "نور الشباك"},
+	"desk":  {"level": 1, "quality": 0.1, "name": "طاولة خشبية"}
+}
+
+# ===================== متجر المعدات =====================
+var shop_items = [
+	{"id":"cam",   "level":2, "name":"كاميرا Canon 4K",      "price":500,   "quality":0.5},
+	{"id":"cam",   "level":3, "name":"كاميرا Sony A7 III",   "price":2000,  "quality":0.8},
+	{"id":"cam",   "level":4, "name":"كاميرا RED 8K",        "price":8000,  "quality":1.0},
+	{"id":"mic",   "level":2, "name":"Rode NT1",             "price":300,   "quality":0.5},
+	{"id":"mic",   "level":3, "name":"Shure SM7B",           "price":900,   "quality":0.8},
+	{"id":"mic",   "level":4, "name":"Neumann U87",          "price":3500,  "quality":1.0},
+	{"id":"pc",    "level":2, "name":"لابتوب i7",            "price":800,   "quality":0.5},
+	{"id":"pc",    "level":3, "name":"Mac Studio M3",        "price":3000,  "quality":0.8},
+	{"id":"pc",    "level":4, "name":"Mac Pro M4 Ultra",     "price":9000,  "quality":1.0},
+	{"id":"soft",  "level":2, "name":"Adobe Premiere Pro",   "price":200,   "quality":0.5},
+	{"id":"soft",  "level":3, "name":"DaVinci Resolve",      "price":600,   "quality":0.8},
+	{"id":"soft",  "level":4, "name":"Full Suite + AI Edit", "price":1500,  "quality":1.0},
+	{"id":"light", "level":2, "name":"Ring Light 26\"",      "price":150,   "quality":0.5},
+	{"id":"light", "level":3, "name":"Softbox احترافي",      "price":500,   "quality":0.8},
+	{"id":"light", "level":4, "name":"استوديو إضاءة كامل",  "price":2000,  "quality":1.0},
+	{"id":"desk",  "level":2, "name":"مكتب مريح",            "price":400,   "quality":0.4},
+	{"id":"desk",  "level":3, "name":"استوديو منزلي",        "price":2500,  "quality":0.7},
+	{"id":"desk",  "level":4, "name":"استوديو احترافي",      "price":10000, "quality":1.0},
+]
+
+# ===================== نظام المهام =====================
+var quests = []
+
+# ===================== نظام الإنجازات =====================
+var achievements = {
+	"first_video":  {"name":"🎬 أول فيديو",          "done":false, "desc":"ارفع أول فيديو"},
+	"1k_subs":      {"name":"🌱 ألف مشترك",          "done":false, "desc":"اجمع 1,000 مشترك"},
+	"10k_subs":     {"name":"⭐ عشرة آلاف",          "done":false, "desc":"اجمع 10,000 مشترك"},
+	"100k_subs":    {"name":"🏅 مئة ألف",            "done":false, "desc":"اجمع 100,000 مشترك"},
+	"1m_subs":      {"name":"💎 مليون",              "done":false, "desc":"اجمع 1,000,000 مشترك"},
+	"10m_subs":     {"name":"👑 عشرة ملايين",        "done":false, "desc":"اجمع 10,000,000 مشترك"},
+	"rich_1000":    {"name":"💰 ألف دولار",          "done":false, "desc":"اجمع 1,000 دولار"},
+	"rich_10000":   {"name":"🤑 عشرة آلاف دولار",   "done":false, "desc":"اجمع 10,000 دولار"},
+	"rich_100000":  {"name":"🏦 مئة ألف دولار",     "done":false, "desc":"اجمع 100,000 دولار"},
+	"streaker_7":   {"name":"🔥 7 أيام متواصلة",    "done":false, "desc":"ارفع 7 أيام بالتسلسل"},
+	"streaker_30":  {"name":"⚡ 30 يوم متواصل",     "done":false, "desc":"ارفع 30 يوم بالتسلسل"},
+	"trending":     {"name":"📈 ترند",              "done":false, "desc":"اصبح في الترند"},
+	"viral":        {"name":"🚀 فيديو فايرل",       "done":false, "desc":"فيديو بأكثر من 1M مشاهدة"},
+	"sponsor":      {"name":"💼 رعاية أولى",        "done":false, "desc":"احصل على أول رعاية"},
+	"max_gear":     {"name":"⚙️ معدات المحترفين",  "done":false, "desc":"حسّن جميع المعدات لمستوى 4"},
+	"collab":       {"name":"🤝 تعاون ناجح",       "done":false, "desc":"تعاون مع صانع محتوى آخر"},
+	"50_videos":    {"name":"📹 50 فيديو",          "done":false, "desc":"ارفع 50 فيديو"},
+	"happy":        {"name":"😊 سعيد دائماً",       "done":false, "desc":"حافظ على السعادة 100%"},
+}
+
+# ===================== المنافسون =====================
+var rivals = [
+	{"name":"خالد الكريمي",  "subs":800,   "growth":0.15, "style":"تقني",   "emoji":"😎", "collab_done":false},
+	{"name":"نورة المبدعة",  "subs":2000,  "growth":0.20, "style":"فلوقز",  "emoji":"🌸", "collab_done":false},
+	{"name":"أحمد الألعاب",  "subs":500,   "growth":0.12, "style":"جيمينج", "emoji":"🎮", "collab_done":false},
+	{"name":"سارة الطبخ",    "subs":3000,  "growth":0.18, "style":"طبخ",    "emoji":"👨‍🍳","collab_done":false},
+	{"name":"مازن المغامر",  "subs":10000, "growth":0.25, "style":"سفر",    "emoji":"✈️", "collab_done":false},
+]
+
+# ===================== الأحداث العشوائية =====================
+var random_events = [
+	{"title":"🔥 فيديو فايرل!",          "desc":"أحد فيديوهاتك انتشر بشكل جنوني!",             "subs_bonus":500,   "money":100,   "energy":-5},
+	{"title":"💻 الحاسوب تعطل!",         "desc":"حاسوبك توقف فجأة وضاع مشروع كامل.",           "subs_bonus":0,     "money":-200,  "energy":-30},
+	{"title":"🤝 عرض تعاون!",            "desc":"يوتيوبر مشهور يريد التعاون معك!",              "subs_bonus":1000,  "money":0,     "energy":-20},
+	{"title":"💔 كوبيرايت!",             "desc":"حصلت على ستريك كوبيرايت في فيديو مهم.",        "subs_bonus":-200,  "money":-100,  "energy":-15},
+	{"title":"📱 تريند جديد!",           "desc":"تريند جديد ظهر! استغله في فيديوك القادم.",     "subs_bonus":300,   "money":30,    "energy":-5},
+	{"title":"🏆 جائزة يوتيوب!",         "desc":"ترشحت لجائزة أفضل قناة ناشئة هذا العام!",     "subs_bonus":2000,  "money":500,   "energy":20},
+	{"title":"😷 مرضت!",                 "desc":"مرضت ولم تستطع الرفع لعدة أيام.",              "subs_bonus":-100,  "money":0,     "energy":-50},
+	{"title":"💡 فكرة عبقرية!",          "desc":"جاتك فكرة فيديو مميزة جداً! استغلها.",        "subs_bonus":0,     "money":0,     "energy":25},
+	{"title":"📺 ذُكرت في الأخبار!",     "desc":"قناة تلفزيونية ذكرت قناتك بشكل إيجابي!",     "subs_bonus":5000,  "money":200,   "energy":10},
+	{"title":"🎓 دورة مجانية!",          "desc":"وجدت دورة مجانية في المونتاج وتعلمت منها.",   "subs_bonus":0,     "money":0,     "energy":-10},
+	{"title":"🌐 تغيير الخوارزمية!",     "desc":"يوتيوب غيّر الخوارزمية وتأثرت قناتك.",       "subs_bonus":-500,  "money":-30,   "energy":-20},
+	{"title":"💸 رعاية مفاجئة!",         "desc":"شركة كبيرة تريد رعاية فيديوك القادم فوراً!", "subs_bonus":0,     "money":1000,  "energy":10},
+	{"title":"😡 تعليقات سلبية!",        "desc":"موجة تعليقات سلبية ضربت قناتك!",              "subs_bonus":-300,  "money":0,     "energy":-25},
+	{"title":"🌟 قصة نجاح!",             "desc":"نشروا قصتك كمثال على النجاح في مجلة شهيرة.", "subs_bonus":3000,  "money":300,   "energy":15},
+	{"title":"⚡ انقطع الإنترنت!",       "desc":"الإنترنت انقطع وفقدت جلسة تسجيل كاملة.",     "subs_bonus":0,     "money":0,     "energy":-20},
+	{"title":"🎁 هدية من مشترك!",        "desc":"مشترك وفيّ أرسل لك هدية ودعماً مالياً!",     "subs_bonus":50,    "money":150,   "energy":20},
+]
+
+# ===================== الفصول القصصية =====================
+var story_chapters = [
+	{
+		"title": "الحلم يبدأ",
+		"req_subs": 0,
+		"dialogue": [
+			{"speaker":"أبو فلة", "text":"عندي حلم كبير... أصير أكبر يوتيوبر عربي وأغيّر حياتي!"},
+			{"speaker":"أبو فلة", "text":"معي بس موبايل قديم وإنترنت بطيء... بس عندي عزيمة لا تُهزم!"},
+			{"speaker":"الأم",    "text":"يا ولدي! متى تلاقي شغل حقيقي؟ اليوتيوب مو مصدر دخل!"},
+			{"speaker":"أبو فلة", "text":"ماما، انتظري وشوفي بعيونك. سأثبت للجميع أنني أقدر!"},
+			{"speaker":"الصديق سامر", "text":"اشمعنى أنت؟ في ناس ما نجحوا بالسنين!"},
+			{"speaker":"أبو فلة", "text":"لأن ما كان عندهم إصراري. الرحلة تبدأ اليوم! 💪"},
+		]
+	},
+	{
+		"title": "أول ألف مشترك",
+		"req_subs": 1000,
+		"dialogue": [
+			{"speaker":"أبو فلة",     "text":"ألف مشترك!! هذه أول علامة حقيقية على أن الحلم ممكن!"},
+			{"speaker":"الصديق سامر", "text":"ماشاء الله يا صاحبي! بدأت الأمور تتحرك. فخور فيك!"},
+			{"speaker":"أبو فلة",     "text":"وهذا مجرد البداية يا سامر. الهدف مليون مشترك!"},
+			{"speaker":"الأم",         "text":"حسناً... ربما في شيء في هذا الموضوع... لكن درّس أيضاً!"},
+			{"speaker":"أبو فلة",     "text":"ماما يعني راضية؟ هذا أحلى من الألف مشترك! 😄"},
+		]
+	},
+	{
+		"title": "الانطلاقة الحقيقية",
+		"req_subs": 100000,
+		"dialogue": [
+			{"speaker":"يوتيوب",  "text":"🎉 مبروك! قناتك تجاوزت 100,000 مشترك! درع الفضة في طريقه!"},
+			{"speaker":"أبو فلة", "text":"درع الفضة!! ما صدقت وصلت لهنا. كل التعب كان يستحق!"},
+			{"speaker":"المدير",  "text":"سمعنا عنك كثيراً. نريد توقيع عقد شراكة مع شركتنا التقنية."},
+			{"speaker":"أبو فلة", "text":"عقد شراكة! الأمور تتغير بشكل لم أتخيله. وهذا مجرد البداية!"},
+			{"speaker":"الأم",    "text":"يا ولدي... أنا فخورة فيك. ربما كنت مخطئة في البداية... 🥺"},
+		]
+	},
+	{
+		"title": "نجم الإنترنت",
+		"req_subs": 1000000,
+		"dialogue": [
+			{"speaker":"صحفي",    "text":"مرحباً أبو فلة! هل تقبل مقابلة لأكبر صحيفة تقنية عربية؟"},
+			{"speaker":"أبو فلة", "text":"مليون مشترك... درع الذهب... ما زلت لا أصدق أنني وصلت لهنا!"},
+			{"speaker":"المنافس", "text":"أعترف... أسلوبك في المحتوى يختلف. تستحق هذا النجاح."},
+			{"speaker":"أبو فلة", "text":"كل شخص آمن فيّ ودعمني، هذا الإنجاز لكم جميعاً!"},
+			{"speaker":"الأم",    "text":"ابني المشهور! 😭 أنا أكثر شخص فخور بك في الدنيا!"},
+		]
+	},
+	{
+		"title": "أسطورة الإنترنت",
+		"req_subs": 10000000,
+		"dialogue": [
+			{"speaker":"يوتيوب",   "text":"10 مليون مشترك! درع الألماس يُرسل إليك مع تهاني الفريق كله!"},
+			{"speaker":"أبو فلة",  "text":"من غرفة صغيرة بحاسوب قديم... إلى هنا. الرحلة كانت تستحق كل شيء!"},
+			{"speaker":"المنافس",  "text":"لو كنت في مكانك لما وصلت لنصف ما وصلت له. أنت استثنائي."},
+			{"speaker":"أبو فلة",  "text":"القصة لم تنته بعد يا صديقي... الهدف: الرقم 1 عالمياً!"},
+			{"speaker":"الجمهور",  "text":"أبو فلة! أبو فلة! أبو فلة! نحبك! 🎉🎉🎉"},
+		]
+	},
+	{
+		"title": "قمة العالم",
+		"req_subs": 50000000,
+		"dialogue": [
+			{"speaker":"مذيع",    "text":"معنا اليوم ظاهرة الإنترنت العربي، أكثر يوتيوبر متابعاً في تاريخ المنطقة!"},
+			{"speaker":"أبو فلة", "text":"50 مليون إنسان يتابعونني... كل واحد منهم جزء من هذا الحلم."},
+			{"speaker":"مذيع",    "text":"ما الذي تريد قوله لكل شاب عنده حلم ويخاف من البدء؟"},
+			{"speaker":"أبو فلة", "text":"ابدأ اليوم، بما عندك، من حيث أنت. الطريق طويل لكنه يستحق كل خطوة."},
+			{"speaker":"الجمهور", "text":"أبو فلة! أبو فلة! أبو فلة! 🏆🌟💎"},
+		]
+	},
+]
+
+# ===================== حالة اللعبة =====================
+var chapter_index         = 0
+var state                 = "menu"
+var upload_streak         = 0
+var days_played           = 1
+var total_videos_uploaded = 0
+var current_day_earnings  = 0.0
+var shown_chapters        = []
+var collab_cooldown       = 0
+
+var recording    = {"active": false, "progress": 0.0, "draft": {}, "type": "عادي"}
+var video_types  = ["تقني","فلوق","تحدي","ردة فعل","تعليمي","كوميدي","مراجعة","قصصي"]
+
+# ===================== عناصر UI =====================
+var root_layer    = null
+var msg_label     = null
+var hud_label     = null
+var notif_queue   = []
+var notif_showing = false
+
+# ===================== نقطة البداية =====================
+func _ready():
+	_init_quests()
+	build_menu()
+
+# ===================== القائمة الرئيسية =====================
+func build_menu():
+	state = "menu"
+	_clear_root()
+	root_layer = CanvasLayer.new()
+	add_child(root_layer)
+
+	var bg = _mk_rect(C_DARK, Vector2(0,0), Vector2(1280,720))
+	root_layer.add_child(bg)
+
+	# شريط علوي ذهبي
+	var top_bar = _mk_rect(Color(0.12,0.09,0.02), Vector2(0,0), Vector2(1280,10))
+	root_layer.add_child(top_bar)
+
+	# عنوان
+	var title = _mk_lbl("🎬  رحلة أبو فلة", 58, C_GOLD, Vector2(310, 100))
+	root_layer.add_child(title)
+
+	var subtitle = _mk_lbl("من الصفر إلى النجومية العالمية", 28, C_ACCENT, Vector2(380, 185))
+	root_layer.add_child(subtitle)
+
+	# بطاقة المعلومات
+	var info_panel = _mk_panel(Vector2(240, 250), Vector2(800, 200))
+	root_layer.add_child(info_panel)
+
+	var info = _mk_lbl(
+		"🎯  الهدف: اجمع 50 مليون مشترك وكن الأفضل عالمياً!\n" +
+		"📹  سجّل فيديوهات وحسّن معداتك وتغلب على المنافسين\n" +
+		"🏆  6 فصول قصصية • إنجازات • أحداث عشوائية • رعايات\n" +
+		"🛒  متجر معدات • نظام تعاون • تدريب المهارات",
+		20, C_WHITE, Vector2(275, 270))
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.size.x = 720
+	root_layer.add_child(info)
+
+	var start_btn = _mk_btn("▶️   ابدأ المغامرة", Vector2(440, 490), Vector2(400, 72), C_GREEN)
+	start_btn.pressed.connect(start_game)
+	root_layer.add_child(start_btn)
+
+	var ver_lbl = _mk_lbl("v2.0 | Godot 4.2+", 16, C_GREY, Vector2(1080, 695))
+	root_layer.add_child(ver_lbl)
+
+# ===================== بدء اللعبة =====================
+func start_game():
+	_clear_root()
+	build_room()
+
+# ===================== بناء الغرفة =====================
+func build_room():
+	state = "room"
+	_clear_root()
+	root_layer = CanvasLayer.new()
+	add_child(root_layer)
+
+	_draw_room_bg()
+	_build_hud()
+	_build_room_buttons()
+
+	msg_label = _mk_lbl("", 22, C_GOLD, Vector2(340, 680))
+	msg_label.size.x = 700
+	root_layer.add_child(msg_label)
+	msg_label.hide()
+
+	if chapter_index == 0 and not shown_chapters.has(0):
+		shown_chapters.append(0)
+		await get_tree().create_timer(0.5).timeout
+		_start_dialogue(story_chapters[0]["dialogue"])
+
+func _draw_room_bg():
+	# خلفية وجدران
+	var wall  = _mk_rect(Color(0.20,0.20,0.30), Vector2(0,0),    Vector2(1280,590))
+	var floor = _mk_rect(Color(0.18,0.14,0.10), Vector2(0,590),  Vector2(1280,130))
+	root_layer.add_child(wall)
+	root_layer.add_child(floor)
+
+	# نافذة
+	var win_light = _mk_rect(Color(0.6,0.8,1.0,0.2), Vector2(870,60), Vector2(220,180))
+	var win_frame = _mk_rect(Color(0.55,0.40,0.25),  Vector2(865,55), Vector2(10,190))
+	var win_top   = _mk_rect(Color(0.55,0.40,0.25),  Vector2(865,55), Vector2(230,10))
+	var win_mid   = _mk_rect(Color(0.55,0.40,0.25),  Vector2(975,55), Vector2(10,190))
+	root_layer.add_child(win_light)
+	root_layer.add_child(win_frame)
+	root_layer.add_child(win_top)
+	root_layer.add_child(win_mid)
+
+	# ملصقات على الجدار
+	var poster1 = _mk_rect(Color(0.8,0.2,0.2,0.6), Vector2(120,100), Vector2(80,100))
+	var poster2 = _mk_rect(Color(0.2,0.6,0.2,0.6), Vector2(220,120), Vector2(60,80))
+	root_layer.add_child(poster1)
+	root_layer.add_child(poster2)
+	var poster_lbl = _mk_lbl("100K", 14, C_WHITE, Vector2(128,140))
+	root_layer.add_child(poster_lbl)
+
+	# طاولة وكمبيوتر
+	var desk  = _mk_rect(Color(0.45,0.30,0.18), Vector2(520,460), Vector2(460,30))
+	var mon   = _mk_rect(Color(0.08,0.08,0.08), Vector2(640,330), Vector2(210,130))
+	var scr   = _mk_rect(Color(0.05,0.25,0.60), Vector2(648,338), Vector2(194,114))
+	var foot  = _mk_rect(Color(0.12,0.12,0.12), Vector2(726,458), Vector2(42,10))
+	var keyb  = _mk_rect(Color(0.15,0.15,0.15), Vector2(640,475), Vector2(180,18))
+	root_layer.add_child(desk)
+	root_layer.add_child(mon)
+	root_layer.add_child(scr)
+	root_layer.add_child(foot)
+	root_layer.add_child(keyb)
+
+	# أيقونة شاشة
+	var yt_lbl = _mk_lbl("▶", 36, C_RED, Vector2(720, 348))
+	root_layer.add_child(yt_lbl)
+
+	# سرير
+	var bed_frame = _mk_rect(Color(0.35,0.22,0.12), Vector2(50,420), Vector2(220,140))
+	var mattress  = _mk_rect(Color(0.80,0.80,0.90), Vector2(55,425), Vector2(210,100))
+	var pillow    = _mk_rect(Color(0.90,0.90,1.00), Vector2(60,428), Vector2(80,55))
+	root_layer.add_child(bed_frame)
+	root_layer.add_child(mattress)
+	root_layer.add_child(pillow)
+
+	# شخصية أبو فلة
+	var p_body = _mk_rect(C_BLUE,                   Vector2(385,455), Vector2(45,85))
+	var p_head = _mk_rect(Color(0.95,0.78,0.60),    Vector2(388,413), Vector2(40,44))
+	var p_eyes = _mk_rect(Color(0.1,0.1,0.1),       Vector2(393,423), Vector2(8,6))
+	var p_eye2 = _mk_rect(Color(0.1,0.1,0.1),       Vector2(407,423), Vector2(8,6))
+	var p_smile= _mk_rect(Color(0.1,0.1,0.1),       Vector2(395,434), Vector2(14,4))
+	root_layer.add_child(p_body)
+	root_layer.add_child(p_head)
+	root_layer.add_child(p_eyes)
+	root_layer.add_child(p_eye2)
+	root_layer.add_child(p_smile)
+
+	# شريط الفصل الحالي
+	var ch_name = story_chapters[min(chapter_index, story_chapters.size()-1)]["title"]
+	var ch_lbl = _mk_lbl("📖 الفصل " + str(chapter_index+1) + ": " + ch_name, 18, C_ACCENT, Vector2(460, 600))
+	root_layer.add_child(ch_lbl)
+
+func _build_hud():
+	var hud_bg = _mk_rect(Color(0,0,0,0.80), Vector2(0,0), Vector2(1280,88))
+	root_layer.add_child(hud_bg)
+
+	hud_label = _mk_lbl("", 17, C_WHITE, Vector2(8,6))
+	hud_label.size.x = 1264
+	root_layer.add_child(hud_label)
+
+	var hud2 = _mk_lbl("", 17, C_ACCENT, Vector2(8,42))
+	hud2.name = "hud2"
+	hud2.size.x = 1264
+	root_layer.add_child(hud2)
+
+	_refresh_hud()
+
+func _refresh_hud():
+	if not hud_label: return
+	hud_label.text = (
+		"🔔 " + _fmt(channel["subs"])     + " مشترك   |   " +
+		"👁  " + _fmt(channel["total_views"]) + " مشاهدة   |   " +
+		"💵 $%.0f" % stats["money"] + "   |   " +
+		"🎬 " + str(channel["videos"])    + " فيديو   |   " +
+		"📅 يوم " + str(days_played)
+	)
+	var hud2 = root_layer.get_node_or_null("hud2")
+	if hud2:
+		hud2.text = (
+			"⚡ طاقة: %.0f%%" % stats["energy"] + "   |   " +
+			"😰 ضغط: %.0f%%" % stats["stress"]  + "   |   " +
+			"😊 سعادة: %.0f%%" % stats["happiness"] + "   |   " +
+			"💪 دافعية: %.0f%%" % stats["motivation"] + "   |   " +
+			"🔥 " + str(upload_streak) + " أيام متواصلة   |   " +
+			"⚙️ جودة المعدات: %.0f%%" % _gear_pct()
+		)
+
+func _build_room_buttons():
+	# صف 1 - أزرار رئيسية
+	var btns1 = [
+		["💻\nكمبيوتر",   Vector2(640,498), Color(0.10,0.35,0.85), "open_computer"],
+		["🛏️\nنم / يوم جديد", Vector2(52,560), Color(0.30,0.12,0.50), "_do_sleep"],
+	]
+	for b in btns1:
+		var btn = _mk_btn(b[0], b[1], Vector2(145,70), b[2])
+		btn.pressed.connect(Callable(self, b[3]))
+		root_layer.add_child(btn)
+
+	# صف أزرار القوائم
+	var menu_btns = [
+		["🛒 المتجر",       Vector2(210, 570), Color(0.55,0.30,0.05), "open_shop"],
+		["📋 المهام",       Vector2(365, 570), Color(0.10,0.50,0.42), "open_quests"],
+		["🏆 الإنجازات",   Vector2(520, 570), Color(0.50,0.35,0.05), "open_achievements"],
+		["⚔️ المنافسون",   Vector2(675, 570), Color(0.55,0.08,0.08), "open_rivals"],
+		["📊 إحصائياتي",   Vector2(830, 570), Color(0.10,0.40,0.12), "open_stats"],
+		["📚 تطوير نفسي",  Vector2(985, 570), Color(0.15,0.35,0.55), "open_training"],
+		["💼 الرعايات",    Vector2(1140, 570), Color(0.38,0.18,0.50), "open_sponsorships"],
+		["🤝 تعاون",       Vector2(210, 648), Color(0.18,0.45,0.55), "open_collab"],
+		["📈 تحليلات",     Vector2(365, 648), Color(0.12,0.12,0.50), "open_analytics"],
+	]
+	for b in menu_btns:
+		var btn = _mk_btn(b[0], b[1], Vector2(140,58), b[2])
+		btn.pressed.connect(Callable(self, b[3]))
+		root_layer.add_child(btn)
+
+# ===================== واجهة الكمبيوتر =====================
+func open_computer():
+	state = "computer"
+	var ov = _mk_ov()
+
+	var panel = _mk_panel(Vector2(270,80), Vector2(740,560))
+	ov.add_child(panel)
+
+	ov.add_child(_mk_lbl("💻  الكمبيوتر", 34, C_GOLD, Vector2(540,96)))
+
+	# نوع الفيديو
+	ov.add_child(_mk_lbl("📂 اختر نوع الفيديو:", 22, C_WHITE, Vector2(300,155)))
+
+	var type_grid = GridContainer.new()
+	type_grid.columns  = 4
+	type_grid.position = Vector2(295,188)
+	ov.add_child(type_grid)
+	for vt in video_types:
+		var is_sel = (recording["type"] == vt)
+		var tb = _mk_btn_raw(vt, Vector2.ZERO, Vector2(155,42),
+			Color(0.35,0.55,0.25) if is_sel else Color(0.18,0.28,0.45))
+		tb.add_theme_font_size_override("font_size", 17)
+		tb.pressed.connect(func(t=vt, o=ov): recording["type"]=t; _close_ov(o); open_computer())
+		type_grid.add_child(tb)
+
+	# حالة الفيديو الحالي
+	var status_txt = ""
+	var status_col = C_WHITE
+	if recording["active"]:
+		status_txt = "⏺  جاري التسجيل الآن..."
+		status_col = C_RED
+	elif not recording["draft"].is_empty():
+		status_txt = "✅ فيديو جاهز | جودة: %.0f%% | نوع: %s" % [
+			recording["draft"].get("quality",0), recording["draft"].get("type","؟")]
+		status_col = C_GREEN
+	else:
+		status_txt = "📭 لا يوجد فيديو جاهز حالياً"
+		status_col = C_GREY
+
+	ov.add_child(_mk_lbl(status_txt, 20, status_col, Vector2(295,378)))
+	ov.add_child(_mk_lbl("⚙️ جودة معداتك الحالية: %.0f%%" % _gear_pct(), 18, C_ACCENT, Vector2(295,408)))
+	ov.add_child(_mk_lbl("⚡ طاقتك: %.0f%%" % stats["energy"], 18, Color(0.9,0.7,0.1), Vector2(620,408)))
+
+	# أزرار العمليات
+	var ops = [
+		["🎥 سجّل فيديو  (-30 ⚡)",          Color(0.70,0.10,0.10), "do_record"],
+		["✂️ مونتاج متقدم (-15 ⚡)",          Color(0.10,0.38,0.70), "do_edit"],
+		["⬆️  ارفع الفيديو على يوتيوب",       Color(0.10,0.60,0.20), "do_upload"],
+	]
+	var bx = 295.0
+	for op in ops:
+		var btn = _mk_btn(op[0], Vector2(bx, 448), Vector2(310,55), op[1])
+		btn.pressed.connect(func(fn=op[2], o=ov): _close_ov(o); call(fn))
+		ov.add_child(btn)
+		bx += 325
+
+	_close_btn(ov, Vector2(970,96))
+
+# ===================== منطق التسجيل =====================
+func do_record():
+	if recording["active"]:
+		_notif("⏺ التسجيل جارٍ بالفعل!"); return
+	if stats["energy"] < 10:
+		_notif("⚡ الطاقة منخفضة جداً! انم أولاً."); return
+	recording["active"] = true
+	stat_change("energy",  -30)
+	stat_change("stress",   12)
+	_refresh_hud()
+	_notif("🎥 بدأ التسجيل... (انتظر)")
+	await get_tree().create_timer(4.0).timeout
+	if not recording["active"]: return
+	recording["active"] = false
+	var q = _calc_quality()
+	recording["draft"] = {"quality": q, "type": recording["type"]}
+	stat_change("tech_skill", 1)
+	stat_change("creativity", -3)
+	_refresh_hud()
+	_notif("✅ انتهى التسجيل! الجودة: %.0f%%" % q)
+
+func _calc_quality() -> float:
+	var q = 18.0
+	q += gear["cam"]["quality"]   * 26.0
+	q += gear["mic"]["quality"]   * 16.0
+	q += gear["light"]["quality"] * 10.0
+	q += stats["creativity"]      *  0.26
+	q += stats["tech_skill"]      *  0.14
+	q += stats["energy"]          *  0.06
+	q += stats["motivation"]      *  0.05
+	if recording["type"] == "تقني"   and stats["tech_skill"]  > 50: q += 12
+	if recording["type"] == "كوميدي" and stats["charisma"]    > 60: q += 10
+	if recording["type"] == "تعليمي" and stats["creativity"]  > 60: q += 8
+	if recording["type"] == "فلوق"   and stats["happiness"]   > 70: q += 7
+	return clamp(q, 5.0, 100.0)
+
+func do_edit():
+	if recording["draft"].is_empty() or recording["active"]:
+		_notif("❌ لا يوجد فيديو للمونتاج."); return
+	if stats["energy"] < 15:
+		_notif("⚡ الطاقة منخفضة!"); return
+	stat_change("energy", -15)
+	var bonus = gear["soft"]["quality"] * 22.0 + gear["pc"]["quality"] * 12.0
+	bonus += stats["editing_skill"] * 0.35
+	recording["draft"]["quality"] = min(100.0, recording["draft"]["quality"] + bonus)
+	stat_change("editing_skill", 2)
+	stat_change("tech_skill",    1)
+	_refresh_hud()
+	_notif("✂️ مونتاج مكتمل! الجودة الآن: %.0f%%" % recording["draft"]["quality"])
+
+func do_upload():
+	if recording["draft"].is_empty() or recording["active"]:
+		_notif("❌ لا يوجد فيديو جاهز للرفع."); return
+	var perf = _calc_perf(recording["draft"]["quality"])
+	_apply_perf(perf)
+	upload_streak         += 1
+	total_videos_uploaded += 1
+	recording["draft"]     = {}
+	_refresh_hud()
+	_notif("✅ رُفع! 👁 %s | 🔔 +%s | 💵 +$%.1f" % [
+		_fmt(perf["views"]), _fmt(perf["new_subs"]), perf["income"]])
+	if randf() < 0.22:
+		await get_tree().create_timer(2.2).timeout
+		_random_event()
+	_check_achievements()
+	check_chapter()
+	_update_quests()
+
+func _calc_perf(quality) -> Dictionary:
+	var q       = quality / 100.0
+	var base    = max(float(channel["subs"]) * 1.6, 160.0)
+	var luck    = randf_range(0.35, 2.8)
+	var viral   = 1.0
+	if randf() < 0.04:
+		viral = randf_range(6.0, 25.0)
+		achievements["viral"]["done"] = true
+	if channel["trending"]: luck *= 1.5
+	var views    = int(base * q * luck * viral)
+	var likes    = int(views * randf_range(0.03, 0.09))
+	var comments = int(views * randf_range(0.005, 0.02))
+	var new_subs = int(float(views) * 0.006 * _gear_mult())
+	var income   = float(views) / 1000.0 * channel["income_per_1k"]
+	return {"views":views,"likes":likes,"comments":comments,"new_subs":new_subs,"income":income}
+
+func _apply_perf(res):
+	channel["total_views"] += res["views"]
+	channel["subs"]        += res["new_subs"]
+	channel["videos"]      += 1
+	channel["likes"]       += res["likes"]
+	channel["comments"]    += res["comments"]
+	channel["growth"]       = 0.1 * _gear_mult()
+	if upload_streak >= 7:
+		channel["growth"] *= 1.6
+		achievements["streaker_7"]["done"] = true
+	if upload_streak >= 30:
+		achievements["streaker_30"]["done"] = true
+	money_add(res["income"])
+	stat_change("energy",     -20)
+	stat_change("stress",      14)
+	stat_change("motivation",  12)
+	current_day_earnings += res["income"]
+
+# ===================== النوم / يوم جديد =====================
+func _do_sleep():
+	days_played += 1
+	new_day()
+	_notif("🌅 يوم جديد رقم %d! 😴" % days_played)
+	_check_achievements()
+	_update_quests()
+	_refresh_hud()
+	if randf() < 0.32:
+		await get_tree().create_timer(1.8).timeout
+		_random_event()
+	if collab_cooldown > 0: collab_cooldown -= 1
+
+func new_day():
+	var daily_growth = int(float(channel["subs"]) * channel["growth"] * 0.006)
+	channel["subs"]        += daily_growth
+	channel["total_views"] += int(float(channel["total_views"]) * 0.003)
+	var passive = float(channel["total_views"]) / 120000.0 * channel["income_per_1k"]
+	money_add(passive)
+	stat_change("energy",      85)
+	stat_change("stress",     -28)
+	stat_change("motivation",   6)
+	stat_change("happiness",    7)
+	upload_streak      = 0
+	current_day_earnings = 0.0
+	_grow_rivals()
+	check_chapter()
+
+# ===================== المنافسون =====================
+func _grow_rivals():
+	for r in rivals:
+		r["subs"] = int(float(r["subs"]) * (1.0 + r["growth"] * 0.01 * randf_range(0.4,1.8)))
+
+func open_rivals():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(180,70), Vector2(920,580))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("⚔️  المنافسون", 34, C_RED, Vector2(540,85)))
+
+	var my_subs = channel["subs"]
+	var y = 158.0
+
+	# ترتيب المنافسين
+	var sorted_rivals = rivals.duplicate()
+	sorted_rivals.sort_custom(func(a,b): return a["subs"] > b["subs"])
+
+	for r in sorted_rivals:
+		var diff   = my_subs - r["subs"]
+		var color  = C_GREEN if diff >= 0 else C_RED
+		var arrow  = "▲ أنت متقدم بـ" if diff >= 0 else "▼ متأخر بـ"
+		var line   = "%s %-16s | 🔔 %-10s | نمو: %.1f%% | %s %s" % [
+			r["emoji"], r["name"], _fmt(r["subs"]), r["growth"],
+			arrow, _fmt(abs(diff))
+		]
+		ov.add_child(_mk_lbl(line, 21, color, Vector2(210,y)))
+		y += 48
+
+	var sep = _mk_rect(C_GOLD, Vector2(195, y+5), Vector2(890, 2))
+	ov.add_child(sep)
+
+	ov.add_child(_mk_lbl("👤 أنت:  🔔 " + _fmt(my_subs) + " مشترك", 26, C_GOLD, Vector2(210, y+18)))
+
+	_close_btn(ov, Vector2(1060,85))
+
+# ===================== التعاون =====================
+func open_collab():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(220,70), Vector2(840,580))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("🤝  التعاون مع صانعي المحتوى", 30, Color(0.4,0.9,0.9), Vector2(380,85)))
+
+	if collab_cooldown > 0:
+		ov.add_child(_mk_lbl("⏳ يجب الانتظار %d يوم قبل التعاون مجدداً" % collab_cooldown, 24, C_RED, Vector2(280,200)))
+		_close_btn(ov, Vector2(1020,85))
+		return
+
+	ov.add_child(_mk_lbl("اختر يوتيوبر للتعاون معه:", 22, C_WHITE, Vector2(260,155)))
+
+	var y = 200.0
+	for r in rivals:
+		var req_subs  = r["subs"] / 2
+		var can_collab = channel["subs"] >= req_subs
+		var done_txt   = " ✅" if r["collab_done"] else ""
+		var line = "%s %s | 🔔 %s | يحتاج: %s مشترك%s" % [
+			r["emoji"], r["name"], _fmt(r["subs"]), _fmt(req_subs), done_txt
+		]
+		var col = C_GREEN if can_collab else C_GREY
+		var btn = _mk_btn(line, Vector2(260,y), Vector2(760,52), col)
+		btn.disabled = not can_collab
+		btn.pressed.connect(func(rv=r, o=ov): _do_collab(rv,o))
+		ov.add_child(btn)
+		y += 62
+
+	_close_btn(ov, Vector2(1020,85))
+
+func _do_collab(r, ov):
+	var bonus_subs  = int(float(r["subs"]) * randf_range(0.05, 0.15))
+	var bonus_money = float(bonus_subs) * 0.3
+	channel["subs"] += bonus_subs
+	money_add(bonus_money)
+	r["collab_done"] = true
+	collab_cooldown   = 5
+	achievements["collab"]["done"] = true
+	_refresh_hud()
+	_notif("🤝 تعاون ناجح مع %s! +%s مشترك +$%.0f" % [r["name"], _fmt(bonus_subs), bonus_money])
+	_check_achievements()
+	_close_ov(ov)
+
+# ===================== المتجر =====================
+func open_shop():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(90,55), Vector2(1100,610))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("🛒  متجر المعدات", 34, C_GOLD, Vector2(520,70)))
+	ov.add_child(_mk_lbl("💵 رصيدك: $%.0f" % stats["money"], 24, C_GREEN, Vector2(870,70)))
+
+	var scroll = ScrollContainer.new()
+	scroll.position = Vector2(100,130)
+	scroll.size     = Vector2(1080,495)
+	ov.add_child(scroll)
+
+	var vbox = VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
+	var cat_labels = {
+		"cam":"📷 الكاميرا","mic":"🎙️ الميكروفون","pc":"💻 الحاسوب",
+		"soft":"🎞️ برنامج المونتاج","light":"💡 الإضاءة","desk":"🪑 المكان"
+	}
+	var cur_cat = ""
+	for item in shop_items:
+		if item["id"] != cur_cat:
+			cur_cat = item["id"]
+			var cat_lbl = _mk_lbl(cat_labels.get(cur_cat,""), 20, C_ACCENT, Vector2.ZERO)
+			cat_lbl.custom_minimum_size = Vector2(1060,30)
+			vbox.add_child(cat_lbl)
+
+		var cur_lv = gear[item["id"]]["level"]
+		if item["level"] <= cur_lv:
+			continue
+
+		var row = HBoxContainer.new()
+		row.custom_minimum_size = Vector2(1060,52)
+		vbox.add_child(row)
+
+		var name_lbl = _mk_lbl(item["name"], 20, C_WHITE, Vector2.ZERO)
+		name_lbl.custom_minimum_size = Vector2(360,50)
+		row.add_child(name_lbl)
+
+		var price_lbl = _mk_lbl("💰 $%d" % item["price"], 20, C_ACCENT, Vector2.ZERO)
+		price_lbl.custom_minimum_size = Vector2(180,50)
+		row.add_child(price_lbl)
+
+		var q_lbl = _mk_lbl("⭐ %.0f%%" % (item["quality"]*100.0), 20, C_GREEN, Vector2.ZERO)
+		q_lbl.custom_minimum_size = Vector2(160,50)
+		row.add_child(q_lbl)
+
+		var can   = stats["money"] >= item["price"]
+		var b_btn = _mk_btn_raw("شراء", Vector2.ZERO, Vector2(140,42), C_GREEN if can else C_GREY)
+		b_btn.disabled = not can
+		b_btn.pressed.connect(func(i=item, o=ov): _buy(i,o))
+		row.add_child(b_btn)
+
+	_close_btn(ov, Vector2(1150,70))
+
+func _buy(item, ov):
+	if stats["money"] < item["price"]:
+		_notif("❌ المال لا يكفي!"); return
+	money_add(-item["price"])
+	gear[item["id"]]["quality"] = item["quality"]
+	gear[item["id"]]["level"]   = item["level"]
+	gear[item["id"]]["name"]    = item["name"]
+	_refresh_hud()
+	_notif("✅ اشتريت: " + item["name"] + "!")
+	_check_achievements()
+	_close_ov(ov)
+	open_shop()
+
+# ===================== الإحصائيات =====================
+func open_stats():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(100,55), Vector2(1080,610))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("📊  إحصائياتك الكاملة", 34, C_BLUE, Vector2(500,70)))
+
+	var left_data = [
+		["⚡ الطاقة",         "%.0f%%" % stats["energy"]],
+		["🎨 الإبداع",        "%.0f%%" % stats["creativity"]],
+		["💻 مهارة التقنية",  "%.0f%%" % stats["tech_skill"]],
+		["✂️ مهارة المونتاج", "%.0f%%" % stats["editing_skill"]],
+		["🌟 الكاريزما",      "%.0f%%" % stats["charisma"]],
+		["😰 الضغط",          "%.0f%%" % stats["stress"]],
+		["😊 السعادة",        "%.0f%%" % stats["happiness"]],
+		["💪 الدافعية",       "%.0f%%" % stats["motivation"]],
+		["💵 المال",          "$%.0f" % stats["money"]],
+	]
+	var right_data = [
+		["🔔 المشتركون",      _fmt(channel["subs"])],
+		["👁️ المشاهدات",      _fmt(channel["total_views"])],
+		["🎬 الفيديوهات",     str(channel["videos"])],
+		["👍 الإعجابات",      _fmt(channel["likes"])],
+		["💬 التعليقات",      _fmt(channel["comments"])],
+		["🔥 الأيام المتواصلة",str(upload_streak)],
+		["📅 الأيام المنقضية",str(days_played)],
+		["📖 الفصل الحالي",   str(chapter_index+1)],
+		["💰 دخل الجلسة",    "$%.0f" % current_day_earnings],
+	]
+
+	var y = 140.0
+	for i in range(left_data.size()):
+		var bar_pct  = 1.0
+		if left_data[i][1].ends_with("%"):
+			bar_pct = float(left_data[i][1].trim_suffix("%")) / 100.0
+		ov.add_child(_mk_lbl(left_data[i][0] + ":  " + left_data[i][1], 20,
+			C_ACCENT if i%2==0 else C_WHITE, Vector2(130, y)))
+		# شريط تقدم
+		var bar_bg = _mk_rect(Color(0.2,0.2,0.2), Vector2(370, y+3), Vector2(180,16))
+		var bar_fg = _mk_rect(C_BLUE,              Vector2(370, y+3), Vector2(int(180*bar_pct),16))
+		ov.add_child(bar_bg)
+		ov.add_child(bar_fg)
+		y += 38
+
+	y = 140.0
+	for d in right_data:
+		ov.add_child(_mk_lbl(d[0] + ":  " + d[1], 20, C_WHITE, Vector2(640, y)))
+		y += 38
+
+	# المعدات الحالية
+	ov.add_child(_mk_lbl("⚙️ معداتي:", 22, C_GOLD, Vector2(900, 140)))
+	var gy = 175.0
+	for key in gear:
+		var g = gear[key]
+		ov.add_child(_mk_lbl(g["name"] + " (%.0f%%)" % (g["quality"]*100), 17, C_WHITE, Vector2(900,gy)))
+		gy += 32
+
+	_close_btn(ov, Vector2(1140,70))
+
+# ===================== التدريب =====================
+func open_training():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(260,70), Vector2(760,580))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("📚  تطوير نفسك", 32, C_BLUE, Vector2(540,85)))
+	ov.add_child(_mk_lbl("⚡ طاقتك: %.0f%%  |  💵 مالك: $%.0f" % [stats["energy"], stats["money"]],
+		20, C_ACCENT, Vector2(290,130)))
+
+	var trainings = [
+		["🎨 مارس الإبداع",       "creativity",    8,  20, 0,   "أفكار فيديوهات جديدة ومميزة"],
+		["💻 تعلم التقنية",       "tech_skill",    7,  25, 0,   "مهارات تصوير وإنتاج أفضل"],
+		["✂️ تعلم المونتاج",      "editing_skill", 7,  20, 50,  "جودة مونتاج أعلى في الفيديوهات"],
+		["🌟 طور كاريزماتك",      "charisma",      6,  15, 0,   "تفاعل أكبر مع جمهورك"],
+		["😴 استرح وخفف الضغط",   "stress",       -25, -35,0,  "صفّي ذهنك واسترح"],
+		["🏋️ اهتم بصحتك",        "happiness",    15,  -8, 30,  "طاقة أعلى وتركيز أفضل"],
+		["📖 دورة يوتيوب",        "tech_skill",   15,  30, 200, "تعلم أسرار خوارزمية يوتيوب"],
+		["🧠 تأمل وتفكير",        "motivation",   10,  -5, 0,   "وضوح في الهدف والمسار"],
+		["🎬 تحليل المحتوى",      "creativity",   12,  20, 0,   "ادرس أفضل القنوات وتعلم"],
+	]
+
+	var y = 170.0
+	for t in trainings:
+		var stat_key = t[1]
+		var gain     = t[2]
+		var cost_e   = t[3]
+		var cost_m   = t[4]
+		var tooltip  = t[5]
+		var can = stats["energy"] >= abs(cost_e) and stats["money"] >= cost_m
+		var btn = _mk_btn(
+			"%-20s  طاقة: %+d  |  $%d  |  +%d %s" % [t[0], -abs(cost_e), cost_m, abs(gain), stat_key],
+			Vector2(280,y), Vector2(700,48), C_BLUE if can else C_GREY)
+		btn.disabled = not can
+		btn.pressed.connect(func(tr=t, o=ov): _do_train(tr,o))
+		ov.add_child(btn)
+		y += 54
+
+	_close_btn(ov, Vector2(980,85))
+
+func _do_train(t, ov):
+	var cost_e = t[3]; var cost_m = t[4]; var stat_key = t[1]; var gain = t[2]
+	if stats["energy"] < abs(cost_e) or stats["money"] < cost_m:
+		_notif("❌ لا يكفي المال أو الطاقة!"); return
+	stat_change("energy", -abs(cost_e))
+	money_add(-float(cost_m))
+	if stat_key == "stress": stat_change("stress", gain)
+	else: stat_change(stat_key, gain)
+	_refresh_hud()
+	_notif("✅ تدريب منجز: " + t[0])
+	_close_ov(ov)
+
+# ===================== الرعايات =====================
+func open_sponsorships():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(220,70), Vector2(840,580))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("💼  الرعايات التجارية", 32, C_GOLD, Vector2(520,85)))
+	ov.add_child(_mk_lbl("الرعايات الأعلى أجراً تحتاج مشتركين أكثر", 20, C_GREY, Vector2(290,133)))
+
+	var subs = channel["subs"]
+	var all_sponsors = [
+		{"name":"🍕 مطعم محلي",           "pay":50,     "req":1000,     "emoji":"🍕"},
+		{"name":"👗 متجر ملابس",           "pay":200,    "req":10000,    "emoji":"👗"},
+		{"name":"📱 شركة موبايل",          "pay":1500,   "req":100000,   "emoji":"📱"},
+		{"name":"💻 شركة تقنية كبرى",     "pay":10000,  "req":1000000,  "emoji":"💻"},
+		{"name":"🚗 شركة سيارات فاخرة",   "pay":50000,  "req":10000000, "emoji":"🚗"},
+		{"name":"✈️ شركة طيران",           "pay":200000, "req":30000000, "emoji":"✈️"},
+	]
+
+	var y = 175.0
+	var has_any = false
+	for sp in all_sponsors:
+		var can_take = subs >= sp["req"]
+		var status   = "" if can_take else " (تحتاج %s مشترك)" % _fmt(sp["req"])
+		var btn = _mk_btn(
+			sp["name"] + status + "  →  +$%s" % _fmt(int(sp["pay"])),
+			Vector2(265,y), Vector2(750,55), C_GREEN if can_take else C_GREY)
+		btn.disabled = not can_take
+		btn.pressed.connect(func(s=sp, o=ov): _accept_sponsor(s,o))
+		ov.add_child(btn)
+		y += 66
+		if can_take: has_any = true
+
+	if not has_any:
+		ov.add_child(_mk_lbl("تحتاج 1,000 مشترك على الأقل لأول رعاية!", 22, C_GREY, Vector2(290,200)))
+
+	_close_btn(ov, Vector2(1020,85))
+
+func _accept_sponsor(sp, ov):
+	money_add(sp["pay"])
+	achievements["sponsor"]["done"] = true
+	_refresh_hud()
+	_notif("💼 رعاية مقبولة: " + sp["name"] + " +$%s" % _fmt(int(sp["pay"])))
+	_check_achievements()
+	_close_ov(ov)
+
+# ===================== التحليلات =====================
+func open_analytics():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(160,55), Vector2(960,610))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("📈  تحليلات قناتك", 34, C_PURPLE, Vector2(540,70)))
+
+	var data = [
+		["متوسط المشاهدات لكل فيديو",
+			_fmt(int(float(channel["total_views"]) / max(1,channel["videos"])))],
+		["نسبة الإعجابات",
+			"%.2f%%" % (float(channel["likes"]) / max(1,channel["total_views"]) * 100.0)],
+		["نسبة التعليقات",
+			"%.3f%%" % (float(channel["comments"]) / max(1,channel["total_views"]) * 100.0)],
+		["نسبة تحويل المشاهدة لاشتراك",
+			"%.3f%%" % (float(channel["subs"]) / max(1,channel["total_views"]) * 100.0)],
+		["الدخل الكلي المكتسب",    "$%.2f" % stats["money"]],
+		["معدل نمو المشتركين اليومي","%.2f%%" % (channel["growth"] * 100.0)],
+		["جودة المعدات الكلية",     "%.0f%%" % _gear_pct()],
+		["عدد الأيام المنقضية",     str(days_played)],
+		["حالة الترند",             "نعم 🔥" if channel["trending"] else "لا"],
+		["أيام متواصلة",            str(upload_streak)],
+	]
+
+	var y = 148.0
+	for d in data:
+		var row_bg = _mk_rect(Color(0.15,0.15,0.25,0.6), Vector2(185,y-4), Vector2(920,34))
+		ov.add_child(row_bg)
+		ov.add_child(_mk_lbl(d[0], 20, C_WHITE, Vector2(200,y)))
+		ov.add_child(_mk_lbl(d[1], 20, C_GOLD,  Vector2(820,y)))
+		y += 42
+
+	# نصائح
+	var tips = []
+	if stats["stress"] > 70:   tips.append("⚠️ ضغطك عالٍ جداً، خذ استراحة!")
+	if stats["energy"] < 30:   tips.append("⚡ طاقتك منخفضة، انم مبكراً!")
+	if upload_streak == 0:     tips.append("🎯 ارفع فيديو اليوم لتبدأ سلسلة أيام!")
+	if gear["cam"]["level"] < 2: tips.append("📷 كاميرتك قديمة، طوّرها لتحسين الجودة!")
+	if channel["subs"] > 1000 and stats["money"] < 100:
+		tips.append("💡 فعّل الإعلانات للاستفادة من مشتركيك!")
+
+	if tips.size() > 0:
+		ov.add_child(_mk_lbl("💡 نصائح:", 22, C_ACCENT, Vector2(190, y+10)))
+		var ty = y + 44
+		for tip in tips:
+			ov.add_child(_mk_lbl(tip, 18, C_WHITE, Vector2(200,ty)))
+			ty += 30
+
+	_close_btn(ov, Vector2(1080,70))
+
+# ===================== المهام =====================
+func _init_quests():
+	quests = [
+		{"id":"q1",  "name":"ارفع أول فيديو",                "tt":"videos",  "target":1,        "rm":20,    "rs":"creativity",    "rv":10, "done":false},
+		{"id":"q2",  "name":"اجمع 100 مشترك",                "tt":"subs",    "target":100,      "rm":50,    "rs":"charisma",      "rv":5,  "done":false},
+		{"id":"q3",  "name":"ارفع 5 فيديوهات",               "tt":"videos",  "target":5,        "rm":100,   "rs":"tech_skill",    "rv":8,  "done":false},
+		{"id":"q4",  "name":"اجمع 1,000 مشترك",              "tt":"subs",    "target":1000,     "rm":200,   "rs":"creativity",    "rv":15, "done":false},
+		{"id":"q5",  "name":"حقق 10,000 مشاهدة",             "tt":"views",   "target":10000,    "rm":150,   "rs":"motivation",    "rv":10, "done":false},
+		{"id":"q6",  "name":"اشترِ معدة جديدة",              "tt":"gear_any","target":2,        "rm":0,     "rs":"creativity",    "rv":20, "done":false},
+		{"id":"q7",  "name":"ارفع 20 فيديو",                 "tt":"videos",  "target":20,       "rm":500,   "rs":"tech_skill",    "rv":15, "done":false},
+		{"id":"q8",  "name":"اجمع 10,000 مشترك",             "tt":"subs",    "target":10000,    "rm":800,   "rs":"charisma",      "rv":20, "done":false},
+		{"id":"q9",  "name":"حقق مليون مشاهدة",              "tt":"views",   "target":1000000,  "rm":2000,  "rs":"creativity",    "rv":25, "done":false},
+		{"id":"q10", "name":"اجمع 100,000 مشترك",            "tt":"subs",    "target":100000,   "rm":5000,  "rs":"motivation",    "rv":30, "done":false},
+		{"id":"q11", "name":"اكسب $1,000",                   "tt":"money",   "target":1000,     "rm":0,     "rs":"happiness",     "rv":20, "done":false},
+		{"id":"q12", "name":"العب 30 يوماً",                 "tt":"days",    "target":30,       "rm":300,   "rs":"motivation",    "rv":15, "done":false},
+		{"id":"q13", "name":"ارفع 50 فيديو",                 "tt":"videos",  "target":50,       "rm":1000,  "rs":"tech_skill",    "rv":25, "done":false},
+		{"id":"q14", "name":"اجمع مليون مشترك",              "tt":"subs",    "target":1000000,  "rm":20000, "rs":"creativity",    "rv":40, "done":false},
+	]
+
+func _update_quests():
+	for q in quests:
+		if q["done"]: continue
+		var prog = _quest_prog(q)
+		if prog >= q["target"]:
+			q["done"] = true
+			money_add(float(q["rm"]))
+			stat_change(q["rs"], q["rv"])
+			_notif("🏅 مهمة مكتملة: " + q["name"] + " +$%d" % q["rm"])
+			_refresh_hud()
+
+func _quest_prog(q):
+	match q["tt"]:
+		"videos":   return channel["videos"]
+		"subs":     return channel["subs"]
+		"views":    return channel["total_views"]
+		"money":    return int(stats["money"])
+		"days":     return days_played
+		"gear_any":
+			var max_lv = 1
+			for g in gear.values(): max_lv = max(max_lv, g["level"])
+			return max_lv
+	return 0
+
+func open_quests():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(130,55), Vector2(1020,610))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("📋  المهام", 34, C_ACCENT, Vector2(570,70)))
+
+	var done_count = 0
+	for q in quests:
+		if q["done"]: done_count += 1
+	ov.add_child(_mk_lbl("%d / %d مكتمل" % [done_count, quests.size()], 22, C_GREEN, Vector2(880,70)))
+
+	var scroll = ScrollContainer.new()
+	scroll.position = Vector2(140,130)
+	scroll.size     = Vector2(1000,495)
+	ov.add_child(scroll)
+
+	var vbox = VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
+	for q in quests:
+		var prog = _quest_prog(q)
+		var pct  = min(1.0, float(prog) / float(q["target"]))
+		var status = "✅" if q["done"] else ("%.0f%%" % (pct*100))
+		var col    = C_GREEN if q["done"] else (C_ACCENT if pct > 0.5 else C_WHITE)
+		var line   = "%s  %-30s  |  %s / %s  |  +$%d +%s(%d)" % [
+			status, q["name"],
+			_fmt(prog), _fmt(q["target"]),
+			q["rm"], q["rs"], q["rv"]
+		]
+		var lbl = _mk_lbl(line, 19, col, Vector2.ZERO)
+		lbl.custom_minimum_size = Vector2(980,42)
+		vbox.add_child(lbl)
+
+	_close_btn(ov, Vector2(1110,70))
+
+# ===================== الإنجازات =====================
+func _check_achievements():
+	var s = channel["subs"]
+	if total_videos_uploaded >= 1:  achievements["first_video"]["done"]  = true
+	if s >= 1000:                   achievements["1k_subs"]["done"]      = true
+	if s >= 10000:                  achievements["10k_subs"]["done"]     = true
+	if s >= 100000:                 achievements["100k_subs"]["done"]    = true
+	if s >= 1000000:                achievements["1m_subs"]["done"]      = true
+	if s >= 10000000:               achievements["10m_subs"]["done"]     = true
+	if stats["money"] >= 1000:      achievements["rich_1000"]["done"]    = true
+	if stats["money"] >= 10000:     achievements["rich_10000"]["done"]   = true
+	if stats["money"] >= 100000:    achievements["rich_100000"]["done"]  = true
+	if upload_streak >= 7:          achievements["streaker_7"]["done"]   = true
+	if upload_streak >= 30:         achievements["streaker_30"]["done"]  = true
+	if channel["trending"]:         achievements["trending"]["done"]     = true
+	if total_videos_uploaded >= 50: achievements["50_videos"]["done"]    = true
+	if stats["happiness"] >= 99.9:  achievements["happy"]["done"]        = true
+	var all_max = true
+	for g in gear.values():
+		if g["level"] < 4: all_max = false
+	if all_max: achievements["max_gear"]["done"] = true
+
+func open_achievements():
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(130,55), Vector2(1020,610))
+	ov.add_child(panel)
+	ov.add_child(_mk_lbl("🏆  الإنجازات", 34, C_GOLD, Vector2(560,70)))
+
+	var done_c = 0
+	for v in achievements.values():
+		if v["done"]: done_c += 1
+	ov.add_child(_mk_lbl("%d / %d" % [done_c, achievements.size()], 24, C_GREEN, Vector2(940,70)))
+
+	var scroll = ScrollContainer.new()
+	scroll.position = Vector2(140,130)
+	scroll.size     = Vector2(1000,490)
+	ov.add_child(scroll)
+
+	var grid = GridContainer.new()
+	grid.columns = 3
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(grid)
+
+	for key in achievements:
+		var a = achievements[key]
+		var card = Panel.new()
+		card.custom_minimum_size = Vector2(310,80)
+		var sty = StyleBoxFlat.new()
+		sty.bg_color = Color(0.25,0.22,0.05,0.9) if a["done"] else Color(0.10,0.10,0.18,0.9)
+		sty.border_color = C_GOLD if a["done"] else C_GREY
+		sty.border_width_left   = 2; sty.border_width_right  = 2
+		sty.border_width_top    = 2; sty.border_width_bottom = 2
+		sty.corner_radius_top_left=8; sty.corner_radius_top_right=8
+		sty.corner_radius_bottom_left=8; sty.corner_radius_bottom_right=8
+		card.add_theme_stylebox_override("panel", sty)
+		grid.add_child(card)
+
+		var n_lbl = Label.new()
+		n_lbl.text = a["name"]
+		n_lbl.position = Vector2(10,8)
+		n_lbl.add_theme_font_size_override("font_size",18)
+		n_lbl.add_theme_color_override("font_color", C_GOLD if a["done"] else C_GREY)
+		card.add_child(n_lbl)
+
+		var d_lbl = Label.new()
+		d_lbl.text = a["desc"]
+		d_lbl.position = Vector2(10,36)
+		d_lbl.add_theme_font_size_override("font_size",14)
+		d_lbl.add_theme_color_override("font_color", C_WHITE if a["done"] else C_GREY)
+		card.add_child(d_lbl)
+
+		if a["done"]:
+			var done_lbl = Label.new()
+			done_lbl.text = "✅ مكتمل"
+			done_lbl.position = Vector2(230,56)
+			done_lbl.add_theme_font_size_override("font_size",14)
+			done_lbl.add_theme_color_override("font_color",C_GREEN)
+			card.add_child(done_lbl)
+
+	_close_btn(ov, Vector2(1110,70))
+
+# ===================== الأحداث العشوائية =====================
+func _random_event():
+	var ev = random_events[randi() % random_events.size()]
+	channel["subs"]  = max(0, channel["subs"] + ev["subs_bonus"])
+	money_add(float(ev["money"]))
+	stat_change("energy", ev["energy"])
+	if ev.get("subs_bonus",0) >= 5000: channel["trending"] = true
+	_refresh_hud()
+
+	var ov = _mk_ov()
+	var panel = _mk_panel(Vector2(320,190), Vector2(640,340))
+	ov.add_child(panel)
+
+	ov.add_child(_mk_lbl(ev["title"], 34, C_GOLD, Vector2(460,206)))
+	var desc_lbl = _mk_lbl(ev["desc"], 22, C_WHITE, Vector2(348,282))
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.size.x = 575
+	ov.add_child(desc_lbl)
+
+	var effects = []
+	if ev["subs_bonus"] != 0: effects.append("%+d مشترك" % ev["subs_bonus"])
+	if ev["money"]       != 0: effects.append("%+$%.0f" % ev["money"])
+	if ev["energy"]      != 0: effects.append("%+%.0f ⚡" % ev["energy"])
+	var eff_col = C_GREEN if ev["subs_bonus"] > 0 or ev["money"] > 0 else C_RED
+	ov.add_child(_mk_lbl("  ".join(effects), 24, eff_col, Vector2(460,362)))
+
+	var ok = _mk_btn("حسناً! 👍", Vector2(500,460), Vector2(240,55), C_BLUE)
+	ok.pressed.connect(func(): _close_ov(ov))
+	ov.add_child(ok)
+	_check_achievements()
+
+# ===================== الفصول القصصية =====================
+func check_chapter():
+	var s = channel["subs"]
+	var milestones = [1000, 100000, 1000000, 10000000, 50000000]
+	for i in range(milestones.size()):
+		var ci = i + 1
+		if s >= milestones[i] and chapter_index < ci and not shown_chapters.has(ci):
+			chapter_index = ci
+			shown_chapters.append(ci)
+			_notif("📖 فصل جديد: " + story_chapters[ci]["title"])
+			await get_tree().create_timer(1.2).timeout
+			_start_dialogue(story_chapters[ci]["dialogue"])
+			# تحديث اسم الفصل في الغرفة
+			break
+	if s >= 50000000 and state != "end":
+		await get_tree().create_timer(1.5).timeout
+		show_ending()
+
+var _dlg_queue   = []
+var _dlg_overlay = null
+
+func _start_dialogue(lines):
+	_dlg_queue = lines.duplicate()
+	_show_dlg_line()
+
+func _show_dlg_line():
+	if _dlg_queue.is_empty():
+		if _dlg_overlay: _dlg_overlay.queue_free(); _dlg_overlay = null
+		return
+
+	if _dlg_overlay: _dlg_overlay.queue_free()
+	_dlg_overlay = CanvasLayer.new()
+	add_child(_dlg_overlay)
+
+	var bg = _mk_rect(Color(0,0,0,0.90), Vector2(0,0), Vector2(1280,720))
+	_dlg_overlay.add_child(bg)
+
+	var line  = _dlg_queue.pop_front()
+	var panel = Panel.new()
+	panel.position = Vector2(60,510)
+	panel.size     = Vector2(1160,195)
+	var sty = StyleBoxFlat.new()
+	sty.bg_color = Color(0.06,0.06,0.18,0.97)
+	sty.border_color = C_ACCENT
+	sty.border_width_left=3; sty.border_width_right=3
+	sty.border_width_top=3;  sty.border_width_bottom=3
+	sty.corner_radius_top_left=14; sty.corner_radius_top_right=14
+	sty.corner_radius_bottom_left=14; sty.corner_radius_bottom_right=14
+	panel.add_theme_stylebox_override("panel", sty)
+	_dlg_overlay.add_child(panel)
+
+	# صورة المتحدث (مربع ملوّن)
+	var speaker_colors = {
+		"أبو فلة": C_BLUE, "الأم": Color(0.9,0.5,0.8),
+		"الصديق سامر": C_GREEN, "يوتيوب": C_RED,
+		"المدير": Color(0.6,0.6,0.2), "صحفي": C_PURPLE,
+		"المنافس": C_RED, "مذيع": Color(0.5,0.8,0.5),
+		"الجمهور": C_GOLD
+	}
+	var sp_col = speaker_colors.get(line["speaker"], C_WHITE)
+	var avatar = _mk_rect(sp_col, Vector2(75,518), Vector2(55,55))
+	_dlg_overlay.add_child(avatar)
+	var av_init = _mk_lbl(line["speaker"].substr(0,1), 30, C_WHITE, Vector2(88,520))
+	_dlg_overlay.add_child(av_init)
+
+	var sp_lbl = _mk_lbl(line["speaker"], 26, sp_col, Vector2(148,522))
+	_dlg_overlay.add_child(sp_lbl)
+
+	var txt_lbl = _mk_lbl(line["text"], 22, C_WHITE, Vector2(148,560))
+	txt_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	txt_lbl.size.x = 1050
+	_dlg_overlay.add_child(txt_lbl)
+
+	var remaining = _dlg_queue.size()
+	var cont_lbl  = "متابعة ◀  (%d)" % remaining if remaining > 0 else "إغلاق ✓"
+	var cont = _mk_btn(cont_lbl, Vector2(1080,672), Vector2(175,45), C_BLUE)
+	cont.pressed.connect(_show_dlg_line)
+	_dlg_overlay.add_child(cont)
+
+	var skip = _mk_btn("تخطي", Vector2(70,672), Vector2(120,45), C_GREY)
+	skip.pressed.connect(func():
+		_dlg_queue.clear()
+		_show_dlg_line()
+	)
+	_dlg_overlay.add_child(skip)
+
+# ===================== شاشة النهاية =====================
+func show_ending():
+	state = "end"
+	var ov = CanvasLayer.new()
+	add_child(ov)
+
+	var bg = _mk_rect(C_DARK, Vector2(0,0), Vector2(1280,720))
+	ov.add_child(bg)
+
+	# خلفية ذهبية متحركة (نجوم ثابتة)
+	for i in range(16):
+		var star = _mk_rect(C_GOLD, Vector2(randf_range(50,1230), randf_range(50,670)), Vector2(12+randi()%16,12+randi()%16))
+		star.modulate.a = randf_range(0.3,0.8)
+		ov.add_child(star)
+
+	ov.add_child(_mk_lbl("🏆",  90, C_GOLD,   Vector2(574,55)))
+	ov.add_child(_mk_lbl("أنت أسطورة الإنترنت!", 52, C_GOLD, Vector2(310,175)))
+	ov.add_child(_mk_lbl("أعظم يوتيوبر عربي في التاريخ! 🌍", 32, C_WHITE, Vector2(330,255)))
+
+	# خط فاصل ذهبي
+	var line = _mk_rect(C_GOLD, Vector2(200,305), Vector2(880,3))
+	ov.add_child(line)
+
+	# الإحصائيات النهائية
+	var final_stats = [
+		["🔔", "المشتركون",   _fmt(channel["subs"])],
+		["👁️", "المشاهدات",   _fmt(channel["total_views"])],
+		["💵", "المال المكتسب","$%.0f" % stats["money"]],
+		["🎬", "الفيديوهات",   str(channel["videos"])],
+		["📅", "الأيام",       str(days_played)],
+	]
+	var fx = 130.0
+	for fs in final_stats:
+		ov.add_child(_mk_lbl(fs[0]+"\n"+fs[2], 26, C_GOLD,  Vector2(fx,325)))
+		ov.add_child(_mk_lbl(fs[1], 16, C_GREY, Vector2(fx,390)))
+		fx += 210
+
+	var done_c = 0
+	for v in achievements.values():
+		if v["done"]: done_c += 1
+	ov.add_child(_mk_lbl("🏅 الإنجازات: %d / %d" % [done_c, achievements.size()], 26, C_ACCENT, Vector2(460,435)))
+
+	var quote = _mk_lbl(
+		"\" من غرفة صغيرة بحاسوب قديم... إلى قمة العالم.\nشكراً لكل شخص آمن في أن الحلم ممكن. \"",
+		24, C_WHITE, Vector2(220,485))
+	quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quote.size.x = 840
+	ov.add_child(quote)
+
+	var restart = _mk_btn("🔄  العب مرة أخرى", Vector2(280,630), Vector2(340,65), C_GREEN)
+	restart.pressed.connect(func(): ov.queue_free(); _reset(); build_menu())
+	ov.add_child(restart)
+
+	var ach_btn = _mk_btn("🏆  شاهد الإنجازات", Vector2(660,630), Vector2(340,65), C_GOLD)
+	ach_btn.pressed.connect(open_achievements)
+	ov.add_child(ach_btn)
+
+# ===================== إعادة التعيين =====================
+func _reset():
+	stats = {"energy":100.0,"creativity":50.0,"tech_skill":20.0,"charisma":70.0,
+			 "money":0.0,"reputation":0,"stress":0.0,"happiness":80.0,
+			 "motivation":90.0,"editing_skill":10.0}
+	channel = {"name":"أبو فلة","subs":0,"total_views":0,"videos":0,"growth":0.1,
+			   "likes":0,"comments":0,"income_per_1k":0.5,"monthly_income":0.0,"trending":false}
+	gear = {
+		"cam":  {"level":1,"quality":0.2,"name":"موبايل قديم"},
+		"mic":  {"level":1,"quality":0.2,"name":"ميكروفون رخيص"},
+		"pc":   {"level":1,"quality":0.3,"name":"حاسوب قديم"},
+		"soft": {"level":1,"quality":0.1,"name":"مونتاج مجاني"},
+		"light":{"level":1,"quality":0.1,"name":"نور الشباك"},
+		"desk": {"level":1,"quality":0.1,"name":"طاولة خشبية"}
+	}
+	for key in achievements: achievements[key]["done"] = false
+	chapter_index = 0; upload_streak = 0; days_played = 1
+	total_videos_uploaded = 0; shown_chapters = []; collab_cooldown = 0
+	recording = {"active":false,"progress":0.0,"draft":{},"type":"عادي"}
+	rivals = [
+		{"name":"خالد الكريمي","subs":800,  "growth":0.15,"style":"تقني",  "emoji":"😎","collab_done":false},
+		{"name":"نورة المبدعة","subs":2000, "growth":0.20,"style":"فلوقز", "emoji":"🌸","collab_done":false},
+		{"name":"أحمد الألعاب","subs":500,  "growth":0.12,"style":"جيمينج","emoji":"🎮","collab_done":false},
+		{"name":"سارة الطبخ",  "subs":3000, "growth":0.18,"style":"طبخ",   "emoji":"👨‍🍳","collab_done":false},
+		{"name":"مازن المغامر","subs":10000,"growth":0.25,"style":"سفر",   "emoji":"✈️","collab_done":false},
+	]
+	_init_quests()
+
+# ===================== الإشعارات =====================
+func _notif(text):
+	notif_queue.append(text)
+	if not notif_showing:
+		_show_next_notif()
+
+func _show_next_notif():
+	if notif_queue.is_empty():
+		notif_showing = false
+		return
+	notif_showing = true
+	var text = notif_queue.pop_front()
+	if msg_label:
+		msg_label.text = text
+		msg_label.show()
+		await get_tree().create_timer(2.6).timeout
+		if is_instance_valid(msg_label): msg_label.hide()
+	await get_tree().create_timer(0.15).timeout
+	_show_next_notif()
+
+# ===================== دوال مساعدة =====================
+func stat_change(key, amount):
+	if stats.has(key):
+		stats[key] = clamp(stats[key] + float(amount), 0.0, 100.0)
+
+func money_add(amount):
+	stats["money"] = max(0.0, stats["money"] + amount)
+
+func _gear_mult() -> float:
+	var total = 0.0
+	for g in gear.values(): total += g["quality"]
+	return 1.0 + total / float(gear.size())
+
+func _gear_pct() -> float:
+	var total = 0.0
+	for g in gear.values(): total += g["quality"]
+	return (total / float(gear.size())) * 100.0
+
+func _fmt(n: int) -> String:
+	if n >= 1000000000: return "%.1fB" % (float(n)/1000000000.0)
+	if n >= 1000000:    return "%.1fM" % (float(n)/1000000.0)
+	if n >= 1000:       return "%.1fK" % (float(n)/1000.0)
+	return str(n)
+
+# ===================== بناء UI المساعد =====================
+func _mk_rect(color, pos, size) -> ColorRect:
+	var r   = ColorRect.new()
+	r.color = color; r.position = pos; r.size = size
+	return r
+
+func _mk_lbl(text, font_size, color, pos) -> Label:
+	var l = Label.new()
+	l.text = text; l.position = pos
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", color)
+	return l
+
+func _mk_btn(text, pos, size, color) -> Button:
+	var b      = _mk_btn_raw(text, pos, size, color)
+	b.add_theme_font_size_override("font_size", 18)
+	return b
+
+func _mk_btn_raw(text, pos, size, color) -> Button:
+	var b      = Button.new()
+	b.text     = text; b.position = pos; b.size = size
+	b.add_theme_color_override("font_color", C_WHITE)
+	var sty = StyleBoxFlat.new()
+	sty.bg_color = color
+	sty.corner_radius_top_left=9; sty.corner_radius_top_right=9
+	sty.corner_radius_bottom_left=9; sty.corner_radius_bottom_right=9
+	b.add_theme_stylebox_override("normal", sty)
+	var hov = StyleBoxFlat.new()
+	hov.bg_color = Color(min(color.r+0.18,1), min(color.g+0.18,1), min(color.b+0.18,1))
+	hov.corner_radius_top_left=9; hov.corner_radius_top_right=9
+	hov.corner_radius_bottom_left=9; hov.corner_radius_bottom_right=9
+	b.add_theme_stylebox_override("hover", hov)
+	var prs = StyleBoxFlat.new()
+	prs.bg_color = Color(max(color.r-0.1,0), max(color.g-0.1,0), max(color.b-0.1,0))
+	prs.corner_radius_top_left=9; prs.corner_radius_top_right=9
+	prs.corner_radius_bottom_left=9; prs.corner_radius_bottom_right=9
+	b.add_theme_stylebox_override("pressed", prs)
+	return b
+
+func _mk_panel(pos, size) -> Panel:
+	var p = Panel.new()
+	p.position = pos; p.size = size
+	var sty = StyleBoxFlat.new()
+	sty.bg_color       = C_PANEL
+	sty.border_color   = C_ACCENT
+	sty.border_width_left=2; sty.border_width_right=2
+	sty.border_width_top=2;  sty.border_width_bottom=2
+	sty.corner_radius_top_left=14; sty.corner_radius_top_right=14
+	sty.corner_radius_bottom_left=14; sty.corner_radius_bottom_right=14
+	p.add_theme_stylebox_override("panel", sty)
+	return p
+
+func _mk_ov() -> CanvasLayer:
+	var layer = CanvasLayer.new()
+	add_child(layer)
+	var bg = _mk_rect(Color(0,0,0,0.78), Vector2.ZERO, Vector2(1280,720))
+	layer.add_child(bg)
+	return layer
+
+func _close_ov(ov):
+	if is_instance_valid(ov): ov.queue_free()
+	state = "room"
+	_refresh_hud()
+
+func _close_btn(ov, pos):
+	var b = _mk_btn("✖", pos, Vector2(60,40), C_RED)
+	b.pressed.connect(func(): _close_ov(ov))
+	ov.add_child(b)
+
+func _clear_root():
+	if is_instance_valid(root_layer):
+		root_layer.queue_free()
+	root_layer = null; msg_label = null; hud_label = null
+
+# pipe operator helper (Godot 4 لا يدعمه مباشرة - نستخدم lambda)
+# ملاحظة: جميع عناصر UI تُضاف عبر add_child مباشرة
+
